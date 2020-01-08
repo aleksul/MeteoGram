@@ -1,16 +1,48 @@
 import requests
 
-#proxy = {"http":"http://91.206.30.218:3128","https":"https://91.206.30.218:3128" }
+#proxy = {"http": "socks5://{}/".format('92.38.44.232:37430'),"https": "socks5://{}/".format('92.38.44.232:37430')}
 proxy = None
 
-
-
+def ProxyConnect(api_url):
+    global proxy
+    proxy_temp = requests.get("http://pubproxy.com/api/proxy?type=socks5&limit=5&https=true&last_check=60&format=txt")
+    proxy_temp = proxy_temp.content.decode().split("\n")
+    print(proxy_temp)
+    for i in proxy_temp:
+        proxy = {"http": "socks5://{}/".format(i),"https": "socks5://{}/".format(i)}
+        try:
+            response1 = requests.get("http://example.org", proxies = proxy, timeout = 5)
+        except requests.exceptions.ConnectionError:
+            print("pass 1")
+            continue             
+        else:
+            try:
+                response2 = requests.get("http://telegram.org", proxies = proxy, timeout = 10)
+            except requests.exceptions.ConnectionError:
+                print("pass 2")
+                continue
+            else:
+                try:
+                    response = requests.get(api_url+'getMe', timeout = 10, proxies = proxy)
+                except requests.exceptions.ConnectionError:
+                    print("pass 3")
+                    continue
+                else:
+                    return True
+    ProxyConnect(api_url)    
+    
 class BotHandler:
+    global proxy
 
     def __init__(self, token):
         self.token = token
         self.api_url = "https://api.telegram.org/bot{}/".format(token)
-
+        try:
+            response = requests.get(self.api_url+'getMe', timeout = 10, proxies = proxy)
+        except requests.exceptions.ConnectionError:
+            print("None proxy is bad")
+            ProxyConnect(self.api_url)
+                    
     def get_updates(self, offset=None, timeout=30):
         method = 'getUpdates'
         params = {'timeout': timeout, 'offset': offset}

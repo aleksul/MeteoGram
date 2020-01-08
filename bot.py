@@ -2,6 +2,8 @@ from requests_proxy_bot_handler import *
 from telegram_api_for_python import *
 from time import sleep
 
+
+
 token1 = "1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw"
 eos_bot = BotHandler(token1) 
 
@@ -16,7 +18,9 @@ but1 = InlineButtonBuilder('кнопка 1', callback_data = '/1')
 but1 = but1.build()
 but2 = InlineButtonBuilder('trashbox', url = 'http://trashbox.ru')
 but2 = but2.build()
-markup2 = InlineMarkupBuilder([[but1],[but2]])
+but3 = InlineButtonBuilder('pay 2000р', callback_data ='pay', pay = True)
+but3 = but3.build()
+markup2 = InlineMarkupBuilder([[but1],[but2, but3]])
 markup2 = markup2.build()
 
 def main():  
