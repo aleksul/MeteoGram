@@ -11,24 +11,18 @@ def ProxyConnect(api_url):
     for i in proxy_temp:
         proxy = {"http": "socks5://{}/".format(i),"https": "socks5://{}/".format(i)}
         try:
-            response1 = requests.get("http://example.org", proxies = proxy, timeout = 5)
+            response2 = requests.get("http://telegram.org", proxies = proxy, timeout = 10)
         except requests.exceptions.ConnectionError:
             print("pass 1")
-            continue             
+            continue
         else:
             try:
-                response2 = requests.get("http://telegram.org", proxies = proxy, timeout = 10)
+                response = requests.get(api_url+'getMe', timeout = 20, proxies = proxy)
             except requests.exceptions.ConnectionError:
                 print("pass 2")
                 continue
             else:
-                try:
-                    response = requests.get(api_url+'getMe', timeout = 10, proxies = proxy)
-                except requests.exceptions.ConnectionError:
-                    print("pass 3")
-                    continue
-                else:
-                    return True
+                return True
     ProxyConnect(api_url)    
     
 class BotHandler:
