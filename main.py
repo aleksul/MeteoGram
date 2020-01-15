@@ -1,13 +1,19 @@
-from requests_proxy_bot_handler import *
+from bot_handler import *
 from telegram_api_for_python import *
 from time import sleep
+import sys
+import os
 
-
+def restart_program():
+    """Restarts the current program.
+    Note: this function does not return. Any cleanup action (like
+    saving data) must be done before calling this function."""
+    print("Restart!")
+    python = sys.executable
+    os.execl(python, python, * sys.argv)
 
 token1 = "1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw"
 eos_bot = BotHandler(token1) 
-
-
         
 key1 = KeyboardBuilder([['HI','Wassup?'],['BYE']])
 key1 = key1.build()

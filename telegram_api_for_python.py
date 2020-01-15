@@ -1,7 +1,4 @@
-
 ReplyKeyboardRemove = '{"remove_keyboard": true, "selective": false}'
-
-
 
 class KeyboardBuilder:
     
