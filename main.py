@@ -1,20 +1,20 @@
+#!/usr/bin/env python
+
 from bot_handler import *
 from telegram_api_for_python import *
 from time import sleep
-import sys
-import os
+import logging
 
-def restart_program():
-    """Restarts the current program.
-    Note: this function does not return. Any cleanup action (like
-    saving data) must be done before calling this function."""
-    print("Restart!")
-    python = sys.executable
-    os.execl(python, python, * sys.argv)
+logging.basicConfig(filename='bot.log',
+                    format='%(asctime)s    %(levelname)s: %(message)s',
+                    datefmt='%d/%m/%Y %I:%M:%S',
+                    level=logging.INFO)
 
+logging.info("""Program started""")
 token1 = "1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw"
 eos_bot = BotHandler(token1) 
-        
+logging.info("Bot init complete!")
+
 key1 = KeyboardBuilder([['HI','Wassup?'],['BYE']])
 key1 = key1.build()
 markup1 = ReplyKeyboardMarkupBuilder(key1)
@@ -31,7 +31,7 @@ markup2 = markup2.build()
 
 def main():  
     new_offset = None
-    print('Start')
+    logging.info("Main started!")
     while True:        
         eos_bot.get_updates(new_offset)
 
