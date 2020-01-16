@@ -16,22 +16,36 @@ class BotHandler:
         try:
             response = requests.get(self.api_url+'getMe', timeout = 15, proxies = proxy)
         except requests.exceptions.ConnectionError:
-            logging.warning("Connection error... well, let's find a proxy")
-            proxy = proxy_finder.ProxyConnectGetMe(self.api_url)
-                    
+            logging.warning("Connection error...")
+            if proxy_finder.InternetConnection():
+                logging.info("OK, we have interet but also telegram doesn't work")
+                logging.info("Let's find a proxy in local file")
+                proxy = proxy_finder.ProxyLoader(self.api_url)
+                if proxy == False:
+                    logging.info("No proxy in local file or they don't work anymore")
+                    proxy = proxy_finder.ProxyConnectGetMe(self.api_url)
+                    if proxy == False:
+                        restart.program()
+                        #ProxyBroker will be here
+        else:
+            logging.info("Works fine with proxy = {}".format(proxy))
+
     def get_updates(self, offset=None, timeout=30):
+        global proxy
         method = 'getUpdates'
         params = {'timeout': timeout, 'offset': offset}
         logging.info('Getting updates...')
         try:
             resp = requests.get(self.api_url + method, params, proxies = proxy)
         except Exception as err:
-            logging.error("Pull error: {}".fotmat(type(err)))
+            logging.error("Pull error: {}".format(type(err)))
             restart.program()
-        result_json = resp.json()['result']
-        return result_json
+        else:
+            result_json = resp.json()['result']
+            return result_json
 
     def send_message(self, chat_id, text, markup = None):
+        global proxy
         params = {'chat_id': chat_id, 'text': text, 'reply_markup': markup}
         method = 'sendMessage'
         try:
@@ -39,7 +53,8 @@ class BotHandler:
         except Exception as err:
             logging.error("Send error: {}".format(type(err)))
             restart.program()
-        return resp
+        else:
+            return resp
         
     def get_last_update(self):
         get_result = self.get_updates()

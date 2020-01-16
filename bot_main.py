@@ -2,7 +2,6 @@
 
 from bot_handler import *
 from telegram_api_for_python import *
-from time import sleep
 import logging
 
 logging.basicConfig(filename='bot.log',
@@ -12,8 +11,8 @@ logging.basicConfig(filename='bot.log',
 
 logging.info("""Program started""")
 token1 = "1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw"
-eos_bot = BotHandler(token1) 
-logging.info("Bot init complete!")
+eos_bot = BotHandler(token1)
+logging.info("Bot init complete!") #why it has been called several times?
 
 key1 = KeyboardBuilder([['HI','Wassup?'],['BYE']])
 key1 = key1.build()

@@ -10,4 +10,4 @@ def program():
     logging.info("Restart in 5 sec!")
     sleep(5)
     logging.info("Restart!")
-    exec(open('main.py').read())
+    exec(open('bot_main.py').read())
