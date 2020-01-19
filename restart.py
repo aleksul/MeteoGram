@@ -4,10 +4,10 @@ Note: this function does not return.
 Any cleanup action (like saving data) must be done before calling this function.
 """
 import logging
-from time import sleep
-
-def program():    
-    logging.info("Restart in 5 sec!")
-    sleep(5)
+from os import execl
+import sys
+def program():
     logging.info("Restart!")
-    exec(open('bot_main.py').read())
+    #exec(open('/home/pi/bot/bot_main.py').read())
+    python = sys.executable
+    execl(python, python, *sys.argv)

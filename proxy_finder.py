@@ -2,6 +2,9 @@ import requests
 import logging
 import restart
 from os import path, stat, remove
+from time import sleep
+
+TXT_FILE = '/home/pi/bot/proxy.txt'
 
 def InternetConnection():
     response = None
@@ -9,12 +12,13 @@ def InternetConnection():
         response = requests.get("http://example.org")
     except Exception as err:
         logging.critical("Voila, the exception: {}.".format(type(err)))
+        sleep(5)
         restart.program()
     else:
         logging.info("Internet seems to be connected")
         logging.info("Here is the response from example.org: {}".format(response.status_code))
         return True
-        
+
 def ProxyConnectGetMe(api_url):
     try:
         proxy_temp = requests.get("http://pubproxy.com/api/proxy?limit=5&https=true&last_check=60&format=txt")
@@ -43,9 +47,8 @@ def ProxyConnectGetMe(api_url):
         logging.warning("Found nothing... uhhh, let's try again")
         return ProxyConnectGetMe(api_url)
 
-            
 def ProxySaver(proxy):
-    with open('proxy.txt', 'a+') as f:
+    with open(TXT_FILE, 'a+') as f:
         read = f.readlines()
         for i in read:
             i = i[:-1:]
@@ -56,48 +59,54 @@ def ProxySaver(proxy):
             logging.info("Succesfully written")
             f.close()
             return True
-    
+
 def ProxyLoader(api_url):
-    if not path.exists("proxy.txt"):
+    if not path.exists(TXT_FILE):
         logging.warning("We don't have a file!")
         return False
-    elif stat("proxy.txt").st_size == 0:
+    elif stat(TXT_FILE).st_size == 0:
         logging.warning("The file is empty!")
         return False
 
     proxy_to_delete = []
-    
-    with open("proxy.txt", "r") as f:
+
+    with open(TXT_FILE, "r") as f:
         read = f.readlines()
-        for i in read:
-            i = i[:-1:]
-            proxy = {"http": "http://{}/".format(i),"https": "https://{}/".format(i)}
-            logging.info("Proxy from local file: {}".format(i))
-            try:
-                response = requests.get(api_url+'getMe', timeout = 20, proxies = proxy)
-            except requests.exceptions.ConnectionError:
-                logging.warning("This one doesn't work... Let's delete it in the end")
-                proxy_to_delete.append(i+"\n")
-                continue
-            else:
-                logging.info("This one works!")
-                f.close()
-                if proxy_to_delete:
-                    logging.info("Proxies to delete: {}".format(proxy_to_delete))
-                    for i in proxy_to_delete:
-                        read.remove(i)
-                    logging.info("New proxy list: {}".format(read))
-                    remove("proxy.txt")
-                    logging.info("Old file deleted")
-                    with open('proxy.txt', 'a+') as f:
-                        for i in read:
-                            f.write(i)
-                        f.close()
-                    logging.info("New file ready")
-                return proxy
-        f.close()    
-    logging.warning("No working proxy in local file... Delete it!")
-    remove("proxy.txt")
+        f.close()
+ 
+    for i in read:
+        i = i[:-1:]
+        proxy = {"http": "http://{}/".format(i),"https": "https://{}/".format(i)}
+        logging.info("Proxy from local file: {}".format(i))
+        try:
+            response = requests.get(api_url+'getMe', timeout = 20, proxies = proxy)
+        except requests.exceptions.ConnectionError:
+            logging.warning("This one doesn't work... Let's delete it in the end")
+            proxy_to_delete.append(i+"\n")
+            continue
+        else:
+            logging.info("This one works!")
+            
+            if proxy_to_delete:
+                logging.info("Proxies to delete: {}".format(proxy_to_delete))
+                for i in proxy_to_delete:
+                    read.remove(i)
+                logging.info("New proxy list: {}".format(read))
+
+                remove(TXT_FILE)
+                logging.info("Old file deleted")
+
+                with open(TXT_FILE, 'a+') as f:
+                    for i in read:
+                        f.write(i)
+                    f.close()
+                logging.info("New file ready")
+
+            return proxy
+
+    logging.warning("No working proxy in local file...")
+    remove(TXT_FILE)
+    logging.info("Deleted it!")
     return False
 
 
@@ -111,7 +120,7 @@ def ProxyConnect():
         proxy = {"http": "http://{}/".format(i),"https": "https://{}/".format(i)}
         try:
             response = requests.get("http://telegram.org", timeout = 20, proxies = proxy)
-        except requests.exceptions.ConnectionError:    
+        except requests.exceptions.ConnectionError:
             continue
         else:
             return proxy
@@ -124,7 +133,7 @@ def ProxyConnectSocks():
         proxy = {"http": "socks5://{}/".format(i),"https": "socks5://{}/".format(i)}
         try:
             response = requests.get("http://telegram.org", timeout = 20, proxies = proxy)
-        except requests.exceptions.ConnectionError:    
+        except requests.exceptions.ConnectionError:
             continue
         else:
             return proxy

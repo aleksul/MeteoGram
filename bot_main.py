@@ -1,15 +1,16 @@
-#!/usr/bin/env python
+#!/usr/bin/python3.6
 
 from bot_handler import *
 from telegram_api_for_python import *
 import logging
 
-logging.basicConfig(filename='bot.log',
+logging.basicConfig(filename='/home/pi/bot/bot.log',
                     format='%(asctime)s    %(levelname)s: %(message)s',
                     datefmt='%d/%m/%Y %I:%M:%S',
                     level=logging.INFO)
 
 logging.info("""Program started""")
+
 token1 = "1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw"
 eos_bot = BotHandler(token1)
 logging.info("Bot init complete!") #why it has been called several times?
@@ -28,7 +29,8 @@ but3 = but3.build()
 markup2 = InlineMarkupBuilder([[but1],[but2, but3]])
 markup2 = markup2.build()
 
-def main():  
+def main():
+
     new_offset = None
     logging.info("Main started!")
     while True:        

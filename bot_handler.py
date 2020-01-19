@@ -2,9 +2,10 @@ import requests
 import proxy_finder
 import logging
 import restart
+from time import sleep
 
 proxy = None
-    
+
 class BotHandler:
     global proxy
 
@@ -25,6 +26,7 @@ class BotHandler:
                     logging.info("No proxy in local file or they don't work anymore")
                     proxy = proxy_finder.ProxyConnectGetMe(self.api_url)
                     if proxy == False:
+                        sleep(5)
                         restart.program()
                         #ProxyBroker will be here
         else:
@@ -36,9 +38,10 @@ class BotHandler:
         params = {'timeout': timeout, 'offset': offset}
         logging.info('Getting updates...')
         try:
-            resp = requests.get(self.api_url + method, params, proxies = proxy)
+            resp = requests.get(self.api_url + method, params, proxies = proxy, timeout = 60)
         except Exception as err:
             logging.error("Pull error: {}".format(type(err)))
+            sleep(5)
             restart.program()
         else:
             result_json = resp.json()['result']
@@ -49,21 +52,22 @@ class BotHandler:
         params = {'chat_id': chat_id, 'text': text, 'reply_markup': markup}
         method = 'sendMessage'
         try:
-            resp = requests.post(self.api_url + method, params, proxies = proxy)
+            resp = requests.post(self.api_url + method, params, proxies = proxy, timeout = 60)
         except Exception as err:
             logging.error("Send error: {}".format(type(err)))
+            sleep(5)
             restart.program()
         else:
             return resp
-        
+
     def get_last_update(self):
         get_result = self.get_updates()
-
-        if len(get_result) > 0:
-            last_update = get_result[-1]
+        if get_result is None:
+            return self.get_last_update()
         else:
-            last_update = None
+            if len(get_result) > 0:
+                last_update = get_result[-1]
+            else:
+                last_update = None
 
-        return last_update
-
-
+            return last_update
