@@ -6,7 +6,7 @@ import logging
 
 logging.basicConfig(filename='/home/pi/bot/bot.log',
                     format='%(asctime)s    %(levelname)s: %(message)s',
-                    datefmt='%d/%m/%Y %I:%M:%S',
+                    datefmt='%d/%m/%Y %H:%M:%S',
                     level=logging.INFO)
 
 logging.info("""Program started""")

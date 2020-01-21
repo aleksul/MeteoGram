@@ -36,7 +36,7 @@ class BotHandler:
         global proxy
         method = 'getUpdates'
         params = {'timeout': timeout, 'offset': offset}
-        logging.info('Getting updates...')
+        logging.debug('Getting updates...')
         try:
             resp = requests.get(self.api_url + method, params, proxies = proxy, timeout = 60)
         except Exception as err:
@@ -67,6 +67,7 @@ class BotHandler:
         else:
             if len(get_result) > 0:
                 last_update = get_result[-1]
+                logging.info("Last update: {}".format(last_update))
             else:
                 last_update = None
 
