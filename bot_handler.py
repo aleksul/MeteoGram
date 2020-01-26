@@ -1,5 +1,4 @@
 import requests
-import proxy_finder
 import logging
 import restart
 from time import sleep
@@ -13,24 +12,7 @@ class BotHandler:
         global proxy
         self.token = token
         self.api_url = "https://api.telegram.org/bot{}/".format(token)
-        logging.info("Trying request without proxy")
-        try:
-            response = requests.get(self.api_url+'getMe', timeout = 15, proxies = proxy)
-        except requests.exceptions.ConnectionError:
-            logging.warning("Connection error...")
-            if proxy_finder.InternetConnection():
-                logging.info("OK, we have interet but also telegram doesn't work")
-                logging.info("Let's find a proxy in local file")
-                proxy = proxy_finder.ProxyLoader(self.api_url)
-                if proxy == False:
-                    logging.info("No proxy in local file or they don't work anymore")
-                    proxy = proxy_finder.ProxyConnectGetMe(self.api_url)
-                    if proxy == False:
-                        sleep(5)
-                        restart.program()
-                        #ProxyBroker will be here
-        else:
-            logging.info("Works fine with proxy = {}".format(proxy))
+
 
     def get_updates(self, offset=None, timeout=30):
         global proxy
