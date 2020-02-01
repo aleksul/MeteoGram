@@ -17,18 +17,14 @@ logging.basicConfig(filename='/home/pi/bot/bot.log',
 logging.info('Program started')
 
 admin_id = '196846654'
-eos_token = "1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw"
-test_token = "1050529824:AAHxUjGm7oCAPLD0jnbTC4CEM4_b_aYiB40"
+tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
+kb_start = tg_api.InlineButtonBuilder([['Как пользоваться?']])
 
-kb = tg_api.KeyboardBuilder([['Hi!', 'How r u?'], ['ILY']])
-inbt1 = tg_api.InlineButtonBuilder('Hi', callback_data='1', pay=True)
-inbt2 = tg_api.InlineButtonBuilder('Bye', callback_data='2')
-inkb = tg_api.InlineMarkupBuilder([[inbt1, inbt2]])
 
 
 async def find_proxy():
     internet = Proxy(timeout=3,
-                     site_to_test=f'https://api.telegram.org/bot{test_token}/getMe')
+                     site_to_test=f'https://api.telegram.org/bot{tkbot_token}/getMe')
     if await internet.test1():
         if not await internet.test2():
             proxy = await internet.loader()
@@ -54,9 +50,12 @@ async def find_proxy():
 
 
 async def logic(proxy):
-    proxy = f'http://{proxy}'
+    if proxy:
+        proxy = f'http://{proxy}'
+    else:
+        proxy = None
     async with aiohttp.ClientSession() as session:
-        bot = BotHandler(test_token, session, proxy)
+        bot = BotHandler(tkbot_token, session, proxy)
         new_offset = None
         logging.info("Main started!")
         while True:
@@ -75,11 +74,12 @@ async def logic(proxy):
             else:
                 message_text = received_message['text']
                 if message_text == '/start':
-                    mssg = tg_api.Message(user_id, f'Приветствую, {user_name}!'
-                                                   f'Я бот, который поможет тебе узнать')
-                print(message_text)
-                mssg = tg_api.Message(user_id, 'Hi')
-                await bot.send_message(mssg)
+                    mssg = tg_api.Message(user_id, f'''Приветствую, {user_name}! 
+Я бот, который поможет тебе узнать метеоданные в Троицке!''', reply_markup=kb_start)
+                    await bot.send_message(mssg)
+                elif message_text == 'Как пользоваться?':
+                    mssg = tg_api.Message(user_id, 'Я пока что в разработке!')
+                    await bot.send_message(mssg)
             new_offset = last_update_id + 1
 
 

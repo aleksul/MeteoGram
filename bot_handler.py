@@ -1,9 +1,7 @@
 import asyncio
 import aiohttp
 import logging
-from aiohttp import FormData
 import restart
-import json
 
 
 class BotHandler:
@@ -17,7 +15,9 @@ class BotHandler:
         self.api_url = f"https://api.telegram.org/bot{token}/"
 
     async def get_updates(self, offset=None):
-        params = {'timeout': self.tg_timeout, 'offset': offset}
+        params = {'timeout': self.tg_timeout}
+        if offset:
+            params = params.update(offset=offset)
         logging.debug('Getting updates...')
         try:
             async with self.session.get(

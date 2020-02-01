@@ -1,7 +1,4 @@
-import requests
 import json
-import asyncio
-import aiohttp
 
 ReplyKeyboardRemove = '{"remove_keyboard": true, "selective": false}'
 
