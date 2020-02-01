@@ -1,79 +1,55 @@
+import requests
 import json
+import asyncio
+import aiohttp
 
 ReplyKeyboardRemove = '{"remove_keyboard": true, "selective": false}'
 
 
-class KeyBuilder:
-
-    def __init__(self, texts: list, request_contact=False,
-                 request_location=False):  # example a = KeyboardBuilder([['HI','Wassup?'],['BYE']])
-        self.texts = texts
-        self.request_contact = request_contact
-        self.request_location = request_location
-
-    def build(self):
-        if (self.request_contact is False) and (self.request_location is False):
-            return self.texts
-        else:
-            keyboard = []
-            texts = self.texts
-            for i in texts:
-                temp_list = []
-                for j in i:
-                    if (self.request_contact is True) and (self.request_location is False):
-                        button_dict = {"text": j, "request_contact": True}
-                    elif (self.request_contact is False) and (self.request_location is True):
-                        button_dict = {"text": j, "request_location": True}
-                    elif (self.request_contact is True) and (self.request_location is True):
-                        button_dict = {"text": j, "request_contact": True, "request_location": True}
-                    temp_list.append(button_dict)
-                keyboard.append(temp_list)
-            return keyboard
+def KeyboardButtonBuilder(button: str, request_contact=False, request_location=False):
+    button = dict(button=button, request_contact=request_contact, request_location=request_location)
+    return button
 
 
-class KeyboardBuilder:
-
-    def __init__(self, keyboard: list, resize_keyboard=True, one_time_keyboard=True, selective=False):
-        self.keyboard = keyboard
-        self.resize_keyboard = resize_keyboard
-        self.one_time_keyboard = one_time_keyboard
-        self.selective = selective
-
-    def build(self):
-        markup = {"keyboard": self.keyboard, "resize_keyboard": self.resize_keyboard,
-                  "one_time_keyboard": self.one_time_keyboard, "selective": self.selective}
-        markup = str(markup)
-        markup = markup.replace("True", 'true')
-        markup = markup.replace("False", 'false')
-        markup = markup.replace("'", '"')
-        return markup
+def KeyboardBuilder(keyboard: list, resize_keyboard=True, one_time_keyboard=True, selective=False):
+    # EXAMPLES
+    # a = KeyboardBuilder([['HI','Wassup?'],['BYE']], resize_keyboard=True, one_time_keyboard=True, selective=False)
+    # a = KeyboardBuilder([[{'text': 'Give me contact!', 'request_contact': True}],
+    # [{'text': 'Give me location!', 'request_location': True}]])
+    markup = {"keyboard": keyboard, "resize_keyboard": resize_keyboard,
+              "one_time_keyboard": one_time_keyboard, "selective": selective}
+    return json.dumps(markup)
 
 
-class InlineButtonBuilder:
-
-    def __init__(self, text: str, url=None, callback_data=None, pay=False):
-        self.text = text
-        self.url = url
-        self.callback_data = callback_data
-        self.pay = pay
-
-    def build(self):
-        if self.url is None:
-            button = {"text": self.text, "callback_data": self.callback_data, "pay": self.pay}
-        elif self.callback_data is None:
-            button = {"text": self.text, "url": self.url, "pay": self.pay}
-        return button
+def InlineButtonBuilder(text: str, url=None, callback_data=None, pay=None):
+    button = dict(text=text)
+    if url:
+        button.update(url=url)
+    if callback_data:
+        button.update(callback_data=callback_data)
+    if pay:
+        button.update(pay=pay)
+    return button
 
 
-class InlineMarkupBuilder:
+def InlineMarkupBuilder(keyboard):
+    markup = {"inline_keyboard": keyboard}
+    return json.dumps(markup)
 
-    def __init__(self, keyboard):
-        self.keyboard = keyboard
 
-    def build(self):
-        markup = {"inline_keyboard": self.keyboard}
-        markup = str(markup)
-        markup = markup.replace("True", 'true')
-        markup = markup.replace("False", 'false')
-        markup = markup.replace("'", '"')
-        return markup
+def Message(chat_id: str or int,
+            text: str,
+            parse_mode='Markdown',  # can be "HTML"
+            disable_notification=None,  # boolean
+            reply_to_message_id=None,  # integer
+            reply_markup=None):  # InlineKeyboardMarkup or ReplyKeyboardMarkup or ReplyKeyboardRemove or ForceReply
+    dictionary = dict(chat_id=chat_id, text=text)
+    if parse_mode != 'Markdown':
+        dictionary.update(parse_mode=parse_mode)
+    if disable_notification:
+        dictionary.update(disable_notification=disable_notification)
+    if reply_to_message_id:
+        dictionary.update(reply_to_message_id=reply_to_message_id)
+    if reply_markup:
+        dictionary.update(reply_markup=reply_markup)
+    return dictionary

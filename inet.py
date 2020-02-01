@@ -13,7 +13,7 @@ class Proxy:
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self.filename = filename
 
-    async def is_internet_connected(self):
+    async def test1(self):
         try:
             async with aiohttp.request('GET',
                                        'http://example.org/', timeout=self.timeout) as resp:
@@ -21,6 +21,18 @@ class Proxy:
                 logging.info(f"Internet seems to be connected. Response from example.org: {resp.status}")
         except Exception as err:
             logging.critical(f"Voila, the exception: {type(err)}:{err}")
+            return False
+        else:
+            return True
+
+    async def test2(self):
+        try:
+            async with aiohttp.request('GET',
+                                       self.site_to_test, timeout=self.timeout) as resp:
+                assert resp.status == 200
+                logging.info(f"Internet seems to be connected. Response from {self.site_to_test}: {resp.status}")
+        except Exception as err:
+            logging.warning(f"Site {self.site_to_test} doesn't work: {type(err)}:{err}")
             return False
         else:
             return True
@@ -123,7 +135,7 @@ class Proxy:
             checked_proxies = [i.get('proxy')[7::] for i in checked_proxies]
             with open(self.filename, "w") as f:  # open file as "writable" to delete all the content first
                 for i in checked_proxies:
-                    f.write(i+'\n')
+                    f.write(i + '\n')
             logging.debug(f'Wrote in file this list of proxies: {checked_proxies}')
             return checked_proxies[0]
         else:

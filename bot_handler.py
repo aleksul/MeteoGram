@@ -1,56 +1,77 @@
-import requests
+import asyncio
+import aiohttp
 import logging
+from aiohttp import FormData
 import restart
-from time import sleep
+import json
 
-proxy = None
 
 class BotHandler:
-    global proxy
 
-    def __init__(self, token):
-        global proxy
+    def __init__(self, token, session, proxy=None, timeout=25):
         self.token = token
-        self.api_url = "https://api.telegram.org/bot{}/".format(token)
+        self.session = session
+        self.proxy = proxy
+        self.timeout = aiohttp.ClientTimeout(total=timeout)
+        self.tg_timeout = timeout-10
+        self.api_url = f"https://api.telegram.org/bot{token}/"
 
-
-    def get_updates(self, offset=None, timeout=30):
-        global proxy
-        method = 'getUpdates'
-        params = {'timeout': timeout, 'offset': offset}
+    async def get_updates(self, offset=None):
+        params = {'timeout': self.tg_timeout, 'offset': offset}
         logging.debug('Getting updates...')
         try:
-            resp = requests.get(self.api_url + method, params, proxies = proxy, timeout = 60)
+            async with self.session.get(
+                    f'https://api.telegram.org/bot{self.token}/getUpdates',
+                    data=params, proxy=self.proxy) as resp:
+                assert resp.status == 200
+                result = await resp.json()
+                result = result['result']
         except Exception as err:
-            logging.error("Pull error: {}".format(type(err)))
-            sleep(5)
-            restart.program()
+            logging.error(f"Pull error: {type(err)}:{err}")
+            return None
         else:
-            result_json = resp.json()['result']
-            return result_json
+            return result
 
-    def send_message(self, chat_id, text, markup = None):
-        global proxy
-        params = {'chat_id': chat_id, 'text': text, 'reply_markup': markup}
-        method = 'sendMessage'
+    async def send_message(self, message):
         try:
-            resp = requests.post(self.api_url + method, params, proxies = proxy, timeout = 60)
+            async with self.session.post(
+                    f'https://api.telegram.org/bot{self.token}/sendMessage',
+                    data=message, proxy=self.proxy) as resp:
+                assert resp.status == 200
+        except AssertionError:
+            logging.warning('Assertion error, will try again in 5 seconds')
+            await asyncio.sleep(5)
+            return self.send_message(message)
         except Exception as err:
-            logging.error("Send error: {}".format(type(err)))
-            sleep(5)
-            restart.program()
+            logging.error(f"Send error: {type(err)}:{err}")
+            return restart.program(0)
         else:
-            return resp
+            return None
 
-    def get_last_update(self):
-        get_result = self.get_updates()
+    async def send_photo(self, chat_id, photo_path):
+        with open(photo_path, 'rb') as f:
+            read = f.read()
+        parametrs = dict(chat_id=chat_id, photo=read)
+        try:
+            async with self.session.post(
+                    f'https://api.telegram.org/bot{self.token}/sendPhoto',
+                    data=parametrs, proxy=self.proxy) as resp:
+                assert resp.status == 200
+        except AssertionError:
+            logging.warning('Assertion error!!')
+        except Exception as err:
+            logging.error(f"Send photo error: {type(err)}:{err}")
+            return restart.program(1)
+        else:
+            return None
+
+    async def get_last_update(self):
+        get_result = await self.get_updates()
         if get_result is None:
-            return self.get_last_update()
+            return await self.get_last_update()
         else:
             if len(get_result) > 0:
                 last_update = get_result[-1]
-                logging.info("Last update: {}".format(last_update))
             else:
                 last_update = None
-
             return last_update
