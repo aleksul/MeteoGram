@@ -18,7 +18,6 @@ class BotHandler:
         params = {'timeout': self.tg_timeout}
         if offset:
             params = params.update(offset=offset)
-        logging.debug('Getting updates...')
         try:
             async with self.session.get(
                     f'https://api.telegram.org/bot{self.token}/getUpdates',
