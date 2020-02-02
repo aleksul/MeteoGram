@@ -11,7 +11,7 @@ class BotHandler:
         self.session = session
         self.proxy = proxy
         self.timeout = aiohttp.ClientTimeout(total=timeout)
-        self.tg_timeout = timeout-10
+        self.tg_timeout = timeout - 10
         self.api_url = f"https://api.telegram.org/bot{token}/"
 
     async def get_updates(self, offset=None):
@@ -31,46 +31,65 @@ class BotHandler:
         else:
             return result
 
-    async def send_message(self, message):
+    async def send_message(self,
+                           chat_id: str or int,
+                           text: str,
+                           parse_mode='Markdown',  # can be "HTML"
+                           disable_notification=None,  # boolean
+                           reply_to_message_id=None,  # integer
+                           reply_markup=None):
+        dictionary = dict(chat_id=chat_id, text=text)
+        if parse_mode != 'Markdown':
+            dictionary.update(parse_mode=parse_mode)
+        if disable_notification:
+            dictionary.update(disable_notification=disable_notification)
+        if reply_to_message_id:
+            dictionary.update(reply_to_message_id=reply_to_message_id)
+        if reply_markup:
+            dictionary.update(reply_markup=reply_markup)
         try:
             async with self.session.post(
                     f'https://api.telegram.org/bot{self.token}/sendMessage',
-                    data=message, proxy=self.proxy) as resp:
+                    data=dictionary, proxy=self.proxy) as resp:
                 assert resp.status == 200
         except AssertionError:
-            logging.warning('Assertion error, will try again in 5 seconds')
-            await asyncio.sleep(5)
-            return self.send_message(message)
+            logging.warning('Assertion error!')
         except Exception as err:
             logging.error(f"Send error: {type(err)}:{err}")
-            return restart.program(0)
+            return restart.program(1)
         else:
             return None
 
     async def send_photo(self, chat_id, photo_path):
         with open(photo_path, 'rb') as f:
             read = f.read()
-        parametrs = dict(chat_id=chat_id, photo=read)
+        params = dict(chat_id=chat_id, photo=read)
         try:
             async with self.session.post(
                     f'https://api.telegram.org/bot{self.token}/sendPhoto',
-                    data=parametrs, proxy=self.proxy) as resp:
+                    data=params, proxy=self.proxy) as resp:
                 assert resp.status == 200
         except AssertionError:
-            logging.warning('Assertion error!!')
+            logging.warning('Assertion error!')
         except Exception as err:
             logging.error(f"Send photo error: {type(err)}:{err}")
             return restart.program(1)
         else:
             return None
 
-    async def get_last_update(self):
-        get_result = await self.get_updates()
-        if get_result is None:
-            return await self.get_last_update()
+    async def send_file(self, chat_id, file_path):
+        with open(file_path, 'rb') as f:
+            read = f.read()
+        params = dict(chat_id=chat_id, document=read)
+        try:
+            async with self.session.post(
+                    f'https://api.telegram.org/bot{self.token}/sendDocument',
+                    data=params, proxy=self.proxy) as resp:
+                assert resp.status == 200
+        except AssertionError:
+            logging.warning('Assertion error!')
+        except Exception as err:
+            logging.error(f"Send photo error: {type(err)}:{err}")
+            return restart.program(1)
         else:
-            if len(get_result) > 0:
-                last_update = get_result[-1]
-            else:
-                last_update = None
-            return last_update
+            return None

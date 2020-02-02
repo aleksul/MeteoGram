@@ -22,10 +22,10 @@ logging.basicConfig(filename=f'{path}bot.log',
 
 logging.info('Program started')
 
-admin_id = '196846654'
+admin_id = ['196846654']
 tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
 kb_start = tg_api.KeyboardBuilder([['Как пользоваться?']])
-
+kb_stat = tg_api.KeyboardBuilder([['Лог бота']])
 
 
 async def find_proxy():
@@ -77,17 +77,28 @@ async def logic(proxy):
             user_name = received_message['chat']['first_name']
             message_type = list(received_message.keys())[4]
             if message_type != 'text':
-                mssg = tg_api.Message(user_id, f'{message_type.capitalize()} messages are NOT supported!')
-                asyncio.ensure_future(bot.send_message(mssg))
+                asyncio.ensure_future(bot.send_message(user_id, f'{message_type.capitalize()} messages are NOT '
+                                                                f'supported!'))
             else:
                 message_text = received_message['text']
                 if message_text == '/start':
-                    mssg = tg_api.Message(user_id, f'''Приветствую, {user_name}! 
-Я бот, который поможет тебе узнать метеоданные в Троицке!''', reply_markup=kb_start)
-                    asyncio.ensure_future(bot.send_message(mssg))
+                    asyncio.ensure_future(bot.send_message(user_id, f'Приветствую, {user_name}! \n'
+                                                                    f'Я бот, который поможет тебе '
+                                                                    f'узнать метеоданные в Троицке!',
+                                                           reply_markup=kb_start))
+                elif message_text == '/stat' and user_id in admin_id:
+                    asyncio.ensure_future(bot.send_message(user_id, f'Наконец то мой дорогой админ {user_name} '
+                                                                    f'добрался до статистики! Что интересует?',
+                                                           reply_markup=kb_stat))
+                elif message_text == 'Лог бота' and user_id in admin_id:
+                    asyncio.ensure_future(bot.send_file(user_id, f'{path}bot.log'))
                 elif message_text == 'Как пользоваться?':
-                    mssg = tg_api.Message(user_id, 'Я пока что в разработке!')
-                    asyncio.ensure_future(bot.send_message(mssg))
+                    asyncio.ensure_future(bot.send_message(user_id, 'Все чрезвычайно просто:\n'
+                                                                    '• для просмотра текущего состояния напиши /now\n'
+                                                                    '• для просмотра графика напиши /graph',
+                                                           reply_markup=tg_api.ReplyKeyboardRemove))
+                elif message_text == '/now':
+                    asyncio.ensure_future(bot.send_message(user_id, 'Пока что не прикрутили станцию :)'))
             new_offset = last_update_id + 1
 
 

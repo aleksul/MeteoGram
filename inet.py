@@ -130,7 +130,7 @@ class Proxy:
         checked_proxies = [i for i in checked_proxies if i]  # delete all None's
         if checked_proxies:  # for the case, when all proxies are bad
             checked_proxies = sorted(checked_proxies, key=lambda m: m['ping'])  # sorts proxies to find the fastest
-            logging.info(f'Found fastest {checked_proxies[0]}')
+            logging.info(f'Found fastest {checked_proxies[0]}sec')
             # ...and after we don't need ping argument anymore... and http:// prefix too
             checked_proxies = [i.get('proxy')[7::] for i in checked_proxies]
             with open(self.filename, "w") as f:  # open file as "writable" to delete all the content first

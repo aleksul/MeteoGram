@@ -32,21 +32,3 @@ def InlineButtonBuilder(text: str, url=None, callback_data=None, pay=None):
 def InlineMarkupBuilder(keyboard):
     markup = {"inline_keyboard": keyboard}
     return json.dumps(markup)
-
-
-def Message(chat_id: str or int,
-            text: str,
-            parse_mode='Markdown',  # can be "HTML"
-            disable_notification=None,  # boolean
-            reply_to_message_id=None,  # integer
-            reply_markup=None):  # InlineKeyboardMarkup or ReplyKeyboardMarkup or ReplyKeyboardRemove or ForceReply
-    dictionary = dict(chat_id=chat_id, text=text)
-    if parse_mode != 'Markdown':
-        dictionary.update(parse_mode=parse_mode)
-    if disable_notification:
-        dictionary.update(disable_notification=disable_notification)
-    if reply_to_message_id:
-        dictionary.update(reply_to_message_id=reply_to_message_id)
-    if reply_markup:
-        dictionary.update(reply_markup=reply_markup)
-    return dictionary
