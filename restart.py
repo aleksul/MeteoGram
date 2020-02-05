@@ -20,3 +20,4 @@ def program(secs_of_sleep):
         logging.info(f'Restart on {name}')
         python = sys.executable
         execl(python, python, *sys.argv)
+    return None
