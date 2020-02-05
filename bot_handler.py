@@ -1,4 +1,3 @@
-import asyncio
 import aiohttp
 import logging
 import restart
@@ -6,22 +5,22 @@ import restart
 
 class BotHandler:
 
-    def __init__(self, token, session, proxy=None, timeout=25):
+    def __init__(self, token, session, proxy=None, timeout=20):
         self.token = token
         self.session = session
         self.proxy = proxy
         self.timeout = aiohttp.ClientTimeout(total=timeout)
-        self.tg_timeout = timeout - 10
+        self.tg_timeout = timeout
         self.api_url = f"https://api.telegram.org/bot{token}/"
 
     async def get_updates(self, offset=None):
         params = {'timeout': self.tg_timeout}
         if offset:
-            params = params.update(offset=offset)
+            params.update(offset=offset)
         try:
             async with self.session.get(
                     f'https://api.telegram.org/bot{self.token}/getUpdates',
-                    data=params, proxy=self.proxy) as resp:
+                    params=params, proxy=self.proxy) as resp:
                 assert resp.status == 200
                 result = await resp.json()
                 result = result['result']
