@@ -7,8 +7,8 @@ from bot_handler import BotHandler
 import logging
 import restart
 from concurrent import futures
-from os import name
-from os import path
+from os import name, path
+
 if name == 'nt':
     path = path.dirname(__file__)+'/'
 else:
@@ -22,7 +22,7 @@ logging.basicConfig(filename=f'{path}bot.log',
 
 logging.info('Program started')
 
-admin_id = ['196846654']
+admin_id = ['196846654', '463145322']
 tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
 kb_start = tg_api.KeyboardBuilder([['Как пользоваться?']])
 kb_stat = tg_api.KeyboardBuilder([['Лог бота']])
@@ -63,14 +63,20 @@ async def logic(proxy):
     async with aiohttp.ClientSession() as session:
         bot = BotHandler(tkbot_token, session, proxy)
         new_offset = None
-        previous_update = None
         logging.info("Main started!")
+        BAD_UPDATES_COUNTER = 0
         while True:
             update = await bot.get_updates(new_offset)
-            last_update = update[-1]
-            if last_update == previous_update:
+            if update is None:
+                BAD_UPDATES_COUNTER += 1
+                logging.error('+1 bad update!')
+                if BAD_UPDATES_COUNTER > 5:
+                    restart.program(1)
+                else:
+                    continue
+            if not update:
                 continue
-            previous_update = last_update
+            last_update = update[0]
             last_update_id = last_update['update_id']
             received_message = last_update['message']
             user_id = str(received_message['chat']['id'])
