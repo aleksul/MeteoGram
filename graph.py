@@ -90,6 +90,23 @@ class GRAPH:
         new_date = new_date.strftime('%d-%m-%Y')
         return new_date
 
+    def delete_old(self, days_to_save=30, files_num=1):
+        now = datetime.now()
+        delta = timedelta(days=days_to_save)
+        old = now - delta
+        day = timedelta(1)
+        for i in range(files_num):
+            file_path = self.prog_path + 'data/' + old.strftime('%d-%m-%Y') + '.csv'
+            if path.exists(file_path):
+                remove(file_path)
+            old -= day
+
+    def plot(self, data):
+        minutes = range(1,len(data)+1)
+        plt.plot(minutes, data)
+        plt.xlabel('Minutes')
+        plt.ylabel('Temp')
+        plt.show()
 
 async def main():
     '''
@@ -100,7 +117,7 @@ async def main():
 
 if __name__ == '__main__':
     graph = GRAPH()
-    print(graph.read_csv('Temp', 60))
+    graph.plot(graph.read_csv('Temp', 60))
     ioloop = asyncio.get_event_loop()
     ioloop.run_until_complete(main())
     ioloop.close()
