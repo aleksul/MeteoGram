@@ -34,23 +34,17 @@ kb_choose_time = tg_api.KeyboardBuilder([['Час']])
 
 async def find_proxy():
     internet = Proxy(timeout=3,
-                     site_to_test=f'https://api.telegram.org/bot{tkbot_token}/getMe', filename=f'{path}proxy.txt')
+                     site_to_test=f'https://api.telegram.org/bot{tkbot_token}/getMe',
+                     filename=f'{path}proxy.txt')
     if await internet.test1():
         if not await internet.test2():
-            proxy = await internet.loader()
-            if proxy is None:
-                done, pending = await asyncio.wait(internet.broker_find(), internet.pub_find(),
-                                                   return_when=futures.FIRST_COMPLETED)
-                for future in pending:
-                    future.cancel()
-                if done.result() is None:
-                    proxy = await internet.broker_find()
-                    if proxy is None:
-                        proxy = await internet.pub_find()
-                        if proxy is None:
-                            return restart.program(0)
-                else:
-                    proxy = done.result()
+            done, pending = await asyncio.wait([internet.loader(), internet.broker_find(), internet.pub_find()],
+                                               return_when=futures.FIRST_COMPLETED)
+            if done.pop().result() is None:
+                proxy = asyncio.gather(*[future for future in pending])
+                print(proxy)
+            for future in pending:
+                future.cancel()
         else:
             return None
     else:
