@@ -8,6 +8,7 @@ import logging
 import restart
 from concurrent import futures
 from os import name, path
+from graph import GRAPH
 
 if name == 'nt':
     path = path.dirname(__file__)+'/'
@@ -22,10 +23,13 @@ logging.basicConfig(filename=f'{path}bot.log',
 
 logging.info('Program started')
 
+graph = GRAPH()
 admin_id = ['196846654', '463145322']
 tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
 kb_start = tg_api.KeyboardBuilder([['Как пользоваться?']])
 kb_stat = tg_api.KeyboardBuilder([['Лог бота']])
+kb_choose_parameter = tg_api.KeyboardBuilder([['PM2.5', 'PM10'], ['Температура'], ['Давление', 'Влажность']])
+kb_choose_time = tg_api.KeyboardBuilder([['Час']])
 
 
 async def find_proxy():
@@ -104,13 +108,65 @@ async def logic(proxy):
                                                                     '• для просмотра графика напиши /graph',
                                                            reply_markup=tg_api.ReplyKeyboardRemove))
                 elif message_text == '/now':
-                    asyncio.ensure_future(bot.send_message(user_id, 'Пока что не прикрутили станцию :)'))
+                    temperature = graph.read_csv('Temp', 1)[0]
+                    pm25 = graph.read_csv('PM2.5', 1)[0]
+                    pm10 = graph.read_csv('PM10', 1)[0]
+                    pressure = graph.read_csv('Pres', 1)[0]
+                    humidity = graph.read_csv('Humidity', 1)[0]
+                    asyncio.ensure_future(bot.send_message(user_id, f'Температура: {temperature} °C\n'
+                                                                    f'Давление: {pressure} мм/рт.ст.\n'
+                                                                    f'Влажность: {humidity} %\n'
+                                                                    f'Частицы PM2.5: {pm25} мгр/м³\n'
+                                                                    f'Частицы PM10: {pm10} мгр/м³'))
+                elif message_text == '/graph':
+                    asyncio.ensure_future(bot.send_message(user_id, 'Выберите время:',
+                                                           reply_markup=kb_choose_time))
+                elif message_text == 'Час':
+                    asyncio.ensure_future(bot.send_message(user_id, 'Выберите параметр:',
+                                                           reply_markup=kb_choose_parameter))
+                elif message_text == 'PM2.5':
+                    asyncio.ensure_future(bot.send_photo(user_id,
+                                                         graph.plot_minutes(
+                                                             graph.read_csv('PM2.5', 60), 'PM2.5')
+                                                         )
+                                          )
+                elif message_text == 'PM10':
+                    asyncio.ensure_future(bot.send_photo(user_id,
+                                                         graph.plot_minutes(
+                                                             graph.read_csv('PM10', 60), 'PM10')
+                                                         )
+                                          )
+                elif message_text == 'Температура':
+                    asyncio.ensure_future(bot.send_photo(user_id,
+                                                         graph.plot_minutes(
+                                                             graph.read_csv('Temp', 60), 'Temp')
+                                                         )
+                                          )
+                elif message_text == 'Давление':
+                    asyncio.ensure_future(bot.send_photo(user_id,
+                                                         graph.plot_minutes(
+                                                             graph.read_csv('Pres', 60), 'Pres')
+                                                         )
+                                          )
+                elif message_text == 'Влажность':
+                    asyncio.ensure_future(bot.send_photo(user_id,
+                                                         graph.plot_minutes(
+                                                             graph.read_csv('Humidity', 60), 'Humidity')
+                                                         )
+                                          )
             new_offset = last_update_id + 1
+
+
+async def info():
+    async with aiohttp.ClientSession() as session:
+        while 1:
+            await graph.get_info(session)
 
 
 if __name__ == '__main__':
     ioloop = asyncio.get_event_loop()
     logging.info('Got event loop')
     proxy = ioloop.run_until_complete(find_proxy())
-    ioloop.run_until_complete(logic(proxy))
+    tasks = asyncio.gather(logic(proxy), info())
+    ioloop.run_until_complete(tasks)
     ioloop.close()
