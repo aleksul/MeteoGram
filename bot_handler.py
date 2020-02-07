@@ -59,9 +59,11 @@ class BotHandler:
         else:
             return None
 
-    async def send_photo(self, chat_id, photo_path):
+    async def send_photo(self, chat_id, read):
+        '''
         with open(photo_path, 'rb') as f:
             read = f.read()
+        '''
         params = dict(chat_id=chat_id, photo=read)
         try:
             async with self.session.post(
