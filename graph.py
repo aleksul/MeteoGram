@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timedelta
 import restart
 from os import path, stat, name, remove
+from io import BytesIO
 
 
 class GRAPH:
@@ -45,6 +46,7 @@ class GRAPH:
             with open(file_path, 'a', newline='') as csv_file:
                 writer = csv.writer(csv_file, delimiter=',')
                 writer.writerow(data_to_write)
+            await asyncio.sleep(60)
             return True
 
     def new_csv(self):
@@ -69,7 +71,9 @@ class GRAPH:
             for i in range(len(read_list) - 1, -1, -1):
                 if counter < minutes:
                     counter += 1
-                    data_to_graph.append(read_list[i][parameter])
+                    data_to_graph.append(
+                        round(float(read_list[i][parameter]), 2)
+                    )
                 else:
                     break
             if previous_data:
@@ -101,12 +105,28 @@ class GRAPH:
                 remove(file_path)
             old -= day
 
-    def plot(self, data):
-        minutes = range(1,len(data)+1)
+    def plot_minutes(self, data, parameter):  # do NOT pass
+        minutes = range(1, len(data)+1)
         plt.plot(minutes, data)
-        plt.xlabel('Minutes')
-        plt.ylabel('Temp')
-        plt.show()
+        plt.xlabel('Время, минут')
+        if parameter == 'PM2.5':
+            plt.ylabel('Частицы PM2.5, мгр/м³')
+        elif parameter == 'PM10':
+            plt.ylabel('Частицы PM10, мгр/м³')
+        elif parameter == 'Temp':
+            plt.ylabel('Температура, °C')
+        elif parameter == 'Pres':
+            plt.ylabel('Давление, мм/рт.ст.')
+        elif parameter == 'Humidity':
+            plt.ylabel('Влажность, %')
+        buf = BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        buffer = buf.getvalue()
+        buf.close()
+        plt.close()
+        return buffer
+
 
 async def main():
     '''
@@ -117,7 +137,7 @@ async def main():
 
 if __name__ == '__main__':
     graph = GRAPH()
-    graph.plot(graph.read_csv('Temp', 60))
+    print(graph.read_csv('Temp', 1))
     ioloop = asyncio.get_event_loop()
     ioloop.run_until_complete(main())
     ioloop.close()

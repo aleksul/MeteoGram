@@ -1,8 +1,8 @@
 import random
 import csv
 
-file_path = 'P:/EOS bot/data' + '/' + '07-02-2020' + '.csv'
-
+#file_path = 'P:/EOS bot/data' + '/' + '07-02-2020' + '.csv'
+file_path = 'Z:/eos-tour-bot/data' + '/' + '07-02-2020' + '.csv'
 
 def new_file():
     with open(file_path, "w", newline='') as csv_file:
@@ -13,7 +13,7 @@ def new_file():
 
 def data_writer(i):
     for i in range(i):
-        data_to_write = [random.radint(0, 100)/10, random.randint(0, 100)/10, random.randint(200, 300)/10,
+        data_to_write = [random.randint(0, 100)/10, random.randint(0, 100)/10, random.randint(200, 300)/10,
                          random.randint(7350, 7500)/100, random.randint(0, 100)/10]
         with open(file_path, 'a', newline='') as csv_file:
             writer = csv.writer(csv_file, delimiter=',')

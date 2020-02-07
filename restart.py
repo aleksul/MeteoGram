@@ -4,18 +4,21 @@ Note: this function does not return.
 Any cleanup action (like saving data) must be done before calling this function.
 """
 import logging
-from os import execl
-from os import name
+from os import execl, name, path
 import sys
 from time import sleep
 
 
 def program(secs_of_sleep):
+    if name == 'nt':
+        prog_path = path.dirname(__file__) + '/'
+    else:
+        prog_path = '/home/pi/bot/'
     logging.info(f"Restart in {secs_of_sleep} seconds!")
     sleep(secs_of_sleep)
     if name == 'nt':
         logging.info('Restart on Windows')
-        exec(open('/home/pi/bot/bot_main.py').read())
+        exec(open(f'{prog_path}bot_main.py').read())
     else:
         logging.info(f'Restart on {name}')
         python = sys.executable
