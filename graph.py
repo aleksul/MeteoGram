@@ -22,32 +22,32 @@ class GRAPH:
             self.prog_path = prog_path
 
     async def get_info(self, session):
-        try:
-            async with session.get(self.ip_add) as resp:
-                assert resp.status == 200
-                text = await resp.text()
-        except AssertionError:
-            logging.warning('Assertion error in getting info!')
-            return None
-        except Exception as err:
-            logging.error(f"Getting info from meteo error: {type(err)}:{err}")
-            return restart.program(1)
-        else:
-            soup = BeautifulSoup(text, 'html.parser')
-            soup = soup.find_all('td', class_='r')
-            data_to_write = []
-            for i in range(len(soup) - 2):  # we don't need two last parameters (wifi)
-                i = soup[i].get_text()
-                i = i.replace(u'\xa0', u' ')  # change space to SPACE (I'm just normalizing the string)
-                i = i.split()  # separate value from measurement units
-                data_to_write.append(float(i.pop(0)))
-            data_to_write[3] = data_to_write[3] * 100 / 133  # hPa to mm Hg
-            file_path = self.new_csv()
-            with open(file_path, 'a', newline='') as csv_file:
-                writer = csv.writer(csv_file, delimiter=',')
-                writer.writerow(data_to_write)
-            await asyncio.sleep(60)
-            return True
+        while True:
+            try:
+                async with session.get(self.ip_add) as resp:
+                    assert resp.status == 200
+                    text = await resp.text()
+            except AssertionError:
+                logging.warning('Assertion error in getting info!')
+                return None
+            except Exception as err:
+                logging.error(f"Getting info from meteo error: {type(err)}:{err}")
+                return restart.program(1)
+            else:
+                soup = BeautifulSoup(text, 'html.parser')
+                soup = soup.find_all('td', class_='r')
+                data_to_write = []
+                for i in range(len(soup) - 2):  # we don't need two last parameters (wifi)
+                    i = soup[i].get_text()
+                    i = i.replace(u'\xa0', u' ')  # change space to SPACE (I'm just normalizing the string)
+                    i = i.split()  # separate value from measurement units
+                    data_to_write.append(float(i.pop(0)))
+                data_to_write[3] = data_to_write[3] * 100 / 133  # hPa to mm Hg
+                file_path = self.new_csv()
+                with open(file_path, 'a', newline='') as csv_file:
+                    writer = csv.writer(csv_file, delimiter=',')
+                    writer.writerow(data_to_write)
+                return True
 
     def new_csv(self):
         now = datetime.now()

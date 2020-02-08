@@ -12,11 +12,12 @@ class BotHandler:
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self.tg_timeout = timeout
         self.api_url = f"https://api.telegram.org/bot{token}/"
+        self.offset = None
 
-    async def get_updates(self, offset=None):
+    async def get_updates(self):
         params = {'timeout': self.tg_timeout}
-        if offset:
-            params.update(offset=offset)
+        if self.offset:
+            params.update(offset=self.offset)
         try:
             async with self.session.get(
                     f'https://api.telegram.org/bot{self.token}/getUpdates',
@@ -28,7 +29,8 @@ class BotHandler:
             logging.error(f"Pull error: {type(err)}:{err}")
             return None
         else:
-            return result
+            self.offset = int(result[0]['update_id'])+1
+            return result[0]
 
     async def send_message(self,
                            chat_id: str or int,
