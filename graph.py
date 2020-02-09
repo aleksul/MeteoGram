@@ -51,13 +51,13 @@ class GRAPH:
             return True
 
     def new_csv(self):
-        now = datetime.now()
-        file_path = self.prog_path + 'data/' + now.strftime('%d-%m-%Y') + '.csv'
-        if (not path.exists(file_path)) or (stat(file_path).st_size == 0):  # Firstly, check if we have a file
+        file_path = self.prog_path + 'data/' + datetime.now().strftime('%d-%m-%Y') + '.csv'
+        if (not path.exists(file_path)) or (stat(file_path).st_size == 0):  # check if we have a file
+            logging.debug(f'Create new file: {file_path}')
             with open(file_path, "w", newline='') as csv_file:
                 writer = csv.writer(csv_file, delimiter=',')
                 writer.writerow(['PM2.5', 'PM10', 'Temp', 'Pres', 'Humidity', 'Time'])
-            self.delete_old()
+            self.delete_old()  # call deleter every time we write new file
         return file_path
 
     def read_csv(self, parameter: str, minutes: int, date=None, previous_data=None, previous_time=None):
@@ -95,29 +95,27 @@ class GRAPH:
         else:
             return {'data': data_to_graph, 'time': time_to_graph}
 
-    def previous_date(self, date: str):
+    def previous_date(self, date: str):  # receives date as 01-01-2020 and returns previous date as 31-12-2019
         date = date.split('-')
         date = datetime(int(date[2]), int(date[1]), int(date[0]))
-        delta = timedelta(days=1)
-        new_date = date - delta
-        new_date = new_date.strftime('%d-%m-%Y')
-        return new_date
+        date -= timedelta(days=1)
+        return date.strftime('%d-%m-%Y')
 
     def delete_old(self, days_to_save=30, files_num=1):
-        now = datetime.now()
-        delta = timedelta(days=days_to_save)
-        old = now - delta
-        day = timedelta(1)
+        old_file_date = datetime.now() - timedelta(days=days_to_save)
+        one_day_delta = timedelta(days=1)
         for i in range(files_num):
-            file_path = self.prog_path + 'data/' + old.strftime('%d-%m-%Y') + '.csv'
+            file_path = self.prog_path + 'data/' + old_file_date.strftime('%d-%m-%Y') + '.csv'
+            logging.debug(f'File that should be removed:{file_path}')
             if path.exists(file_path):
                 remove(file_path)
-            old -= day
+                logging.info(f'Removed old file:{file_path}')
+            old_file_date -= one_day_delta
 
     def plot_minutes(self, data, parameter):  # do NOT pass over 100 points
         minutes = data['time']
         data = data['data']
-        plotted = plt.plot(minutes, data, marker='.')
+        plt.plot(minutes, data, marker='.')
         plt.gcf().autofmt_xdate()
         ax = plt.gca()
         labels_count = len(ax.xaxis.get_ticklabels())
@@ -127,7 +125,7 @@ class GRAPH:
         if labels_count > 30:
             for label in ax.xaxis.get_ticklabels()[1::2]:
                 label.set_visible(False)
-        plt.xlabel('Время, минут')
+        plt.xlabel('Время')
         if parameter == 'PM2.5':
             plt.ylabel('Частицы PM2.5, мгр/м³')
         elif parameter == 'PM10':
@@ -138,6 +136,7 @@ class GRAPH:
             plt.ylabel('Давление, мм/рт.ст.')
         elif parameter == 'Humidity':
             plt.ylabel('Влажность, %')
+        plt.title('Данные метеостанции в Точке Кипения г.Троицк')
         buf = BytesIO()
         plt.savefig(buf, format='png')
         buf.seek(0)
