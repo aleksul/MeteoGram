@@ -22,32 +22,33 @@ class GRAPH:
             self.prog_path = prog_path
 
     async def get_info(self, session):
-        while True:
-            try:
-                async with session.get(self.ip_add) as resp:
-                    assert resp.status == 200
-                    text = await resp.text()
-            except AssertionError:
-                logging.warning('Assertion error in getting info!')
-                return None
-            except Exception as err:
-                logging.error(f"Getting info from meteo error: {type(err)}:{err}")
-                return restart.program(1)
-            else:
-                soup = BeautifulSoup(text, 'html.parser')
-                soup = soup.find_all('td', class_='r')
-                data_to_write = []
-                for i in range(len(soup) - 2):  # we don't need two last parameters (wifi)
-                    i = soup[i].get_text()
-                    i = i.replace(u'\xa0', u' ')  # change space to SPACE (I'm just normalizing the string)
-                    i = i.split()  # separate value from measurement units
-                    data_to_write.append(float(i.pop(0)))
-                data_to_write[3] = data_to_write[3] * 100 / 133  # hPa to mm Hg
-                file_path = self.new_csv()
-                with open(file_path, 'a', newline='') as csv_file:
-                    writer = csv.writer(csv_file, delimiter=',')
-                    writer.writerow(data_to_write)
-                return True
+        try:
+            async with session.get(self.ip_add) as resp:
+                assert resp.status == 200
+                text = await resp.text()
+        except AssertionError:
+            logging.warning('Assertion error in getting info!')
+            return None
+        except Exception as err:
+            logging.error(f"Getting info from meteo error: {type(err)}:{err}")
+            return restart.program(1)
+        else:
+            soup = BeautifulSoup(text, 'html.parser')
+            soup = soup.find_all('td', class_='r')
+            data_to_write = []
+            for i in range(len(soup) - 2):  # we don't need two last parameters (wifi)
+                i = soup[i].get_text()
+                i = i.replace(u'\xa0', u' ')  # change space to SPACE (I'm just normalizing the string)
+                i = i.split()  # separate value from measurement units
+                data_to_write.append(float(i.pop(0)))
+            data_to_write[3] = round(data_to_write[3] * 100 / 133, 2)  # hPa to mm Hg
+            file_path = self.new_csv()
+
+            data_to_write.append(datetime.now().strftime('%H:%M:%S'))  # adds time value
+            with open(file_path, 'a', newline='') as csv_file:
+                writer = csv.writer(csv_file, delimiter=',')
+                writer.writerow(data_to_write)
+            return True
 
     def new_csv(self):
         now = datetime.now()
@@ -55,36 +56,44 @@ class GRAPH:
         if (not path.exists(file_path)) or (stat(file_path).st_size == 0):  # Firstly, check if we have a file
             with open(file_path, "w", newline='') as csv_file:
                 writer = csv.writer(csv_file, delimiter=',')
-                writer.writerow(['PM2.5', 'PM10', 'Temp', 'Pres', 'Humidity'])
+                writer.writerow(['PM2.5', 'PM10', 'Temp', 'Pres', 'Humidity', 'Time'])
+            self.delete_old()
         return file_path
 
-    def read_csv(self, parameter: str, minutes: int, date=None, previous_data=None):
+    def read_csv(self, parameter: str, minutes: int, date=None, previous_data=None, previous_time=None):
         data_to_graph = []
+        time_to_graph = []
         if date is None:
-            now = datetime.now()
-            date = now.strftime('%d-%m-%Y')
-        file_path = self.prog_path + 'data/' + date + '.csv'
+            date = datetime.now().strftime('%d-%m-%Y')
+        file_path = self.prog_path + 'data/' + date + '.csv'  # the name of file we will read
         with open(file_path, 'r') as f:
-            reader = csv.DictReader(f)
-            counter = 0
+            reader = csv.DictReader(f)  # read the file as csv table
             read_list = list(reader)
-            for i in range(len(read_list) - 1, -1, -1):
-                if counter < minutes:
-                    counter += 1
-                    data_to_graph.append(
-                        round(float(read_list[i][parameter]), 2)
-                    )
-                else:
-                    break
-            if previous_data:
-                for i in data_to_graph:
-                    previous_data.append(i)
-                data_to_graph = previous_data
-            if counter < minutes:
-                return self.read_csv(parameter=parameter, minutes=minutes - counter,
-                                     date=self.previous_date(date), previous_data=data_to_graph)
+        counter = 0
+        for i in range(len(read_list) - 1, -1, -1):  # read all the data backwards
+            if counter < minutes:  # read until needed limit
+                counter += 1
+                data_to_graph.append(
+                    float(read_list[i][parameter])
+                )
+                time_to_graph.append(
+                    read_list[i]['Time']
+                )
             else:
-                return data_to_graph
+                break
+        if previous_data and previous_time:  # if we called the function recursively
+            for i in data_to_graph:
+                previous_data.append(i)
+            for i in time_to_graph:
+                previous_time.append(i)
+            data_to_graph = previous_data
+            time_to_graph = previous_time
+        if counter < minutes:  # if that's the end of file
+            return self.read_csv(parameter=parameter, minutes=minutes - counter,
+                                 date=self.previous_date(date),
+                                 previous_data=data_to_graph, previous_time=time_to_graph)
+        else:
+            return {'data': data_to_graph, 'time': time_to_graph}
 
     def previous_date(self, date: str):
         date = date.split('-')
@@ -105,9 +114,19 @@ class GRAPH:
                 remove(file_path)
             old -= day
 
-    def plot_minutes(self, data, parameter):  # do NOT pass
-        minutes = range(1, len(data)+1)
-        plt.plot(minutes, data)
+    def plot_minutes(self, data, parameter):  # do NOT pass over 100 points
+        minutes = data['time']
+        data = data['data']
+        plotted = plt.plot(minutes, data, marker='.')
+        plt.gcf().autofmt_xdate()
+        ax = plt.gca()
+        labels_count = len(ax.xaxis.get_ticklabels())
+        if labels_count > 15:
+            for label in ax.xaxis.get_ticklabels()[::2]:
+                label.set_visible(False)
+        if labels_count > 30:
+            for label in ax.xaxis.get_ticklabels()[1::2]:
+                label.set_visible(False)
         plt.xlabel('Время, минут')
         if parameter == 'PM2.5':
             plt.ylabel('Частицы PM2.5, мгр/м³')
@@ -126,18 +145,3 @@ class GRAPH:
         buf.close()
         plt.close()
         return buffer
-
-
-async def main():
-    '''
-    async with aiohttp.ClientSession() as session:
-        await graph.get_info(session)
-    '''
-
-
-if __name__ == '__main__':
-    graph = GRAPH()
-    print(graph.read_csv('Temp', 1))
-    ioloop = asyncio.get_event_loop()
-    ioloop.run_until_complete(main())
-    ioloop.close()

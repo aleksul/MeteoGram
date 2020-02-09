@@ -101,11 +101,11 @@ async def logic(bot):
                                                             '• для построения графика напиши /graph',
                                                    reply_markup=kb_start2))
         elif message_text == '/now':
-            temperature = graph.read_csv('Temp', 1)[0]
-            pm25 = graph.read_csv('PM2.5', 1)[0]
-            pm10 = graph.read_csv('PM10', 1)[0]
-            pressure = graph.read_csv('Pres', 1)[0]
-            humidity = graph.read_csv('Humidity', 1)[0]
+            temperature = graph.read_csv('Temp', 1)['data'][0]
+            pm25 = graph.read_csv('PM2.5', 1)['data'][0]
+            pm10 = graph.read_csv('PM10', 1)['data'][0]
+            pressure = graph.read_csv('Pres', 1)['data'][0]
+            humidity = graph.read_csv('Humidity', 1)['data'][0]
             asyncio.ensure_future(bot.send_message(user_id, f'Температура: {temperature} °C\n'
                                                             f'Давление: {pressure} мм/рт.ст.\n'
                                                             f'Влажность: {humidity} %\n'
@@ -125,8 +125,8 @@ async def logic(bot):
         pass
     elif message_type == 'callback_query':
         if data[0] == '+':
-            bt_pm25 = tg_api.InlineButtonBuilder('PM2.5', callback_data='=PM2.5' + data)
-            bt_pm10 = tg_api.InlineButtonBuilder('PM10', callback_data='=PM10' + data)
+            bt_pm25 = tg_api.InlineButtonBuilder('Частицы PM2.5', callback_data='=PM2.5' + data)
+            bt_pm10 = tg_api.InlineButtonBuilder('Частицы PM10', callback_data='=PM10' + data)
             bt_temp = tg_api.InlineButtonBuilder('Температура', callback_data='=Temp' + data)
             bt_pres = tg_api.InlineButtonBuilder('Давление', callback_data='=Pres' + data)
             bt_humidity = tg_api.InlineButtonBuilder('Влажность', callback_data='=Humidity' + data)
