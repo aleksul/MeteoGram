@@ -20,6 +20,8 @@ def KeyboardBuilder(keyboard: list, resize_keyboard=True, one_time_keyboard=True
 
 def InlineButtonBuilder(text: str, url=None, callback_data=None, pay=None):
     button = dict(text=text)
+    if url is None and callback_data is None and pay is None:
+        raise Exception
     if url:
         button.update(url=url)
     if callback_data:
