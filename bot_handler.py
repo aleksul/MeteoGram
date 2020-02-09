@@ -29,8 +29,11 @@ class BotHandler:
             logging.error(f"Pull error: {type(err)}:{err}")
             return None
         else:
-            self.offset = int(result[0]['update_id'])+1
-            return result[0]
+            if result:
+                self.offset = int(result[0]['update_id'])+1
+                return result[0]
+            else:
+                return None
 
     async def send_message(self,
                            chat_id: str or int,
