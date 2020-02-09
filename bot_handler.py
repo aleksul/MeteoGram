@@ -61,12 +61,15 @@ class BotHandler:
         else:
             return None
 
-    async def send_photo(self, chat_id, read):
+    async def send_photo(self, chat_id, read, reply_markup=None):
         '''
-        with open(photo_path, 'rb') as f:
+        with open(photo_path, 'rb') as f:  # use this to open photo file
             read = f.read()
         '''
-        params = dict(chat_id=chat_id, photo=read)
+        params = dict(chat_id=chat_id)
+        if reply_markup:
+            params.update(reply_markup=reply_markup)
+        params.update(photo=read)
         try:
             async with self.session.post(
                     f'https://api.telegram.org/bot{self.token}/sendPhoto',
@@ -80,10 +83,13 @@ class BotHandler:
         else:
             return None
 
-    async def send_file(self, chat_id, file_path):
+    async def send_file(self, chat_id, file_path, reply_markup=None):
         with open(file_path, 'rb') as f:
             read = f.read()
-        params = dict(chat_id=chat_id, document=read)
+        params = dict(chat_id=chat_id)
+        if reply_markup:
+            params.update(reply_markup=reply_markup)
+        params.update(document=read)
         try:
             async with self.session.post(
                     f'https://api.telegram.org/bot{self.token}/sendDocument',
