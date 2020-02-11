@@ -8,6 +8,7 @@ import logging
 import restart
 from os import name, path
 from graph import GRAPH
+from datetime import datetime
 
 if name == 'nt':
     path = path.dirname(__file__) + '/'
@@ -17,21 +18,22 @@ else:
 logging.basicConfig(filename=f'{path}bot.log',
                     format='%(asctime)s    %(levelname)s: %(message)s',
                     datefmt='%d/%m/%Y %H:%M:%S',
-                    level=logging.INFO)
+                    level=logging.DEBUG)
 
 logging.info('Program started')
 
 graph = GRAPH()
 admin_id = ['196846654', '463145322']
-# tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
-tkbot_token = '1050529824:AAHxUjGm7oCAPLD0jnbTC4CEM4_b_aYiB40'
+tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
 kb_start = tg_api.KeyboardBuilder([['/now', '/graph'], ['/help']], one_time_keyboard=False)
 kb_start2 = tg_api.KeyboardBuilder([['/now'], ['/graph']], one_time_keyboard=False)
 kb_stat = tg_api.KeyboardBuilder([['/log']])
+bt_day = tg_api.InlineButtonBuilder('День', callback_data='-day')
+bt_3h = tg_api.InlineButtonBuilder('3 часа', callback_data='+180')
 bt_1h = tg_api.InlineButtonBuilder('1 час', callback_data='+60')
 bt_30min = tg_api.InlineButtonBuilder('Полчаса', callback_data='+30')
 bt_15min = tg_api.InlineButtonBuilder('15 минут', callback_data='+15')
-kb_choose_time = tg_api.InlineMarkupBuilder([[bt_15min, bt_30min, bt_1h]])
+kb_choose_time = tg_api.InlineMarkupBuilder([[bt_15min, bt_30min, bt_1h], [bt_3h, bt_day]])
 
 
 async def repeat(interval, func, *args, **kwargs):
@@ -42,11 +44,15 @@ async def repeat(interval, func, *args, **kwargs):
 
     *args and **kwargs are passed as the arguments to func.
     """
-    while True:
-        await asyncio.gather(
-            func(*args, **kwargs),
-            asyncio.sleep(interval),
-        )
+    if interval == 0:
+        while True:
+            await func(*args, **kwargs)
+    else:
+        while True:
+            await asyncio.gather(
+                func(*args, **kwargs),
+                asyncio.sleep(interval),
+            )
 
 
 async def find_proxy():
@@ -55,6 +61,7 @@ async def find_proxy():
                  filename=f'{path}proxy.txt')
     results, _ = await asyncio.wait([inet.test1(), inet.test2()])
     results = [i.result() for i in results]
+    logging.debug(results)
     if not results[-1]:  # internet connection test
         return restart.program(5)
     elif results[-2]:  # telegram without proxy connection test
@@ -76,6 +83,7 @@ async def logic(bot):
     update = await bot.get_updates()
     if update is None:
         return None
+    logging.debug("New message!")
     if 'callback_query' in update.keys():
         received_message = update['callback_query']['message']
         message_type = 'callback_query'
@@ -87,6 +95,7 @@ async def logic(bot):
             message_text = received_message['text']
             if message_text[0] == '/':
                 message_type = 'command'
+    logging.debug(f'Message type: {message_type}')
     user_id = str(received_message['chat']['id'])
     user_name = received_message['chat']['first_name']
     if message_type == 'command':
@@ -101,11 +110,12 @@ async def logic(bot):
                                                             '• для построения графика напиши /graph',
                                                    reply_markup=kb_start2))
         elif message_text == '/now':
-            temperature = graph.read_csv('Temp', 1)['data'][0]
-            pm25 = graph.read_csv('PM2.5', 1)['data'][0]
-            pm10 = graph.read_csv('PM10', 1)['data'][0]
-            pressure = graph.read_csv('Pres', 1)['data'][0]
-            humidity = graph.read_csv('Humidity', 1)['data'][0]
+            date = datetime.now().strftime('%d-%m-%Y')
+            temperature = graph.read_csv('Temp', 1, date=date)['data'][0]
+            pm25 = graph.read_csv('PM2.5', 1, date=date)['data'][0]
+            pm10 = graph.read_csv('PM10', 1, date=date)['data'][0]
+            pressure = graph.read_csv('Pres', 1, date=date)['data'][0]
+            humidity = graph.read_csv('Humidity', 1, date=date)['data'][0]
             asyncio.ensure_future(bot.send_message(user_id, f'Температура: {temperature} °C\n'
                                                             f'Давление: {pressure} мм/рт.ст.\n'
                                                             f'Влажность: {humidity} %\n'
@@ -133,16 +143,34 @@ async def logic(bot):
             kb_choose_parameter = tg_api.InlineMarkupBuilder([[bt_pm25, bt_pm10], [bt_temp], [bt_pres, bt_humidity]])
             asyncio.ensure_future(bot.send_message(user_id, 'Выберите параметр:',
                                                    reply_markup=kb_choose_parameter))
+        elif data[0] == '-':
+            if data == '-day':
+                keyboard = [[]]
+                strings_num = 0
+                for i in graph.dates():
+                    if len(keyboard[strings_num]) < 4:
+                        keyboard[strings_num].append(
+                            tg_api.InlineButtonBuilder(i, callback_data='-'+i+data)
+                        )
+                    else:
+                        
         elif data[0] == '=':
             data = data[1:].split('+')
             if data[1] in ['15', '30', '60']:  # minutes
                 asyncio.ensure_future(bot.send_photo(user_id,
                                                      graph.plot_minutes(
-                                                         graph.read_csv(data[0], int(data[1])), data[0])
+                                                         graph.read_csv(data[0], int(data[1])),
+                                                         data[0])
                                                      ))
+            if data[1] == '180':  # 3 hours
+                asyncio.ensure_future(bot.send_photo(user_id,
+                                                     graph.plot_three_hours(
+                                                         graph.read_csv(data[0], int(data[1])),
+                                                         data[0])
+                                                     ))
+
     else:
-        asyncio.ensure_future(bot.send_message(user_id, f'{message_type.capitalize()} messages are NOT '
-                                                        f'supported!'))
+        asyncio.ensure_future(bot.send_message(user_id, 'Данный тип данных не поддерживается'))
 
 
 async def main(best_proxy):

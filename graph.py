@@ -1,12 +1,13 @@
 import asyncio
 import aiohttp
 import matplotlib.pyplot as plt
+#from matplotlib import dates
 from bs4 import BeautifulSoup
 import csv
 import logging
 from datetime import datetime, timedelta
 import restart
-from os import path, stat, name, remove
+from os import path, stat, name, remove, listdir
 from io import BytesIO
 
 
@@ -42,22 +43,28 @@ class GRAPH:
                 i = i.split()  # separate value from measurement units
                 data_to_write.append(float(i.pop(0)))
             data_to_write[3] = round(data_to_write[3] * 100 / 133, 2)  # hPa to mm Hg
-            file_path = self.new_csv()
-
+            file_path = self.csv_path()
             data_to_write.append(datetime.now().strftime('%H:%M:%S'))  # adds time value
             with open(file_path, 'a', newline='') as csv_file:
                 writer = csv.writer(csv_file, delimiter=',')
                 writer.writerow(data_to_write)
+            logging.debug('Wrote info to the file')
             return True
 
-    def new_csv(self):
-        file_path = self.prog_path + 'data/' + datetime.now().strftime('%d-%m-%Y') + '.csv'
+    def csv_path(self, date=None, new_file=True):
+        if date is None:
+            date = datetime.now().strftime('%d-%m-%Y')
+        file_path = self.prog_path + 'data/' + date + '.csv'
         if (not path.exists(file_path)) or (stat(file_path).st_size == 0):  # check if we have a file
-            logging.debug(f'Create new file: {file_path}')
-            with open(file_path, "w", newline='') as csv_file:
-                writer = csv.writer(csv_file, delimiter=',')
-                writer.writerow(['PM2.5', 'PM10', 'Temp', 'Pres', 'Humidity', 'Time'])
-            self.delete_old()  # call deleter every time we write new file
+            if new_file:
+                logging.debug(f'Create new file: {file_path}')
+                with open(file_path, "w", newline='') as csv_file:
+                    writer = csv.writer(csv_file, delimiter=',')
+                    writer.writerow(['PM2.5', 'PM10', 'Temp', 'Pres', 'Humidity', 'Time'])
+                self.delete_old()  # call deleter every time we write new file
+            else:
+                logging.debug("Didn't find anything, try previous date")
+                return self.csv_path(self.previous_date(date), new_file=False)  # call the function until find the file
         return file_path
 
     def read_csv(self, parameter: str, minutes: int, date=None, previous_data=None, previous_time=None):
@@ -65,7 +72,11 @@ class GRAPH:
         time_to_graph = []
         if date is None:
             date = datetime.now().strftime('%d-%m-%Y')
-        file_path = self.prog_path + 'data/' + date + '.csv'  # the name of file we will read
+        file_path = self.csv_path(date=date, new_file=False)  # the name of file we will read
+        if file_path is None:
+            logging.error('No file!')
+            return None
+        logging.debug(f'Reading file: {file_path}')
         with open(file_path, 'r') as f:
             reader = csv.DictReader(f)  # read the file as csv table
             read_list = list(reader)
@@ -109,10 +120,13 @@ class GRAPH:
             logging.debug(f'File that should be removed:{file_path}')
             if path.exists(file_path):
                 remove(file_path)
-                logging.info(f'Removed old file:{file_path}')
+                logging.info(f'Removed old file: {file_path}')
             old_file_date -= one_day_delta
 
     def plot_minutes(self, data, parameter):  # do NOT pass over 100 points
+        if data is None:
+            logging.error("Can't plot the graph, no data!")
+            return None
         minutes = data['time']
         data = data['data']
         plt.plot(minutes, data, marker='.')
@@ -136,6 +150,9 @@ class GRAPH:
             plt.ylabel('Давление, мм/рт.ст.')
         elif parameter == 'Humidity':
             plt.ylabel('Влажность, %')
+        else:
+            logging.error('Parameter is wrong!')
+            return None
         plt.title('Данные метеостанции в Точке Кипения г.Троицк')
         buf = BytesIO()
         plt.savefig(buf, format='png')
@@ -144,3 +161,28 @@ class GRAPH:
         buf.close()
         plt.close()
         return buffer
+
+    def plot_three_hours(self, data, parameter):  # counts average of three nearest points
+        if data is None:
+            logging.error("Can't plot the graph, no data!")
+            return None
+        minutes_temp = data['time']
+        data_temp = data['data']
+        data_to_graph = []
+        minutes_to_graph = []
+        for i in range(3, len(data_temp), 3):
+            avg = round((data_temp[i-2]+data_temp[i-1]+data_temp[i])/3, 2)
+            data_to_graph.append(avg)
+            minutes_to_graph.append(minutes_temp[i])
+        data_return = dict(data=data_to_graph, time=minutes_to_graph)
+        return self.plot_minutes(data_return, parameter)
+
+    def dates(self):
+        if name == 'nt':
+            files = listdir(self.prog_path+'\\data')
+        else:
+            files = listdir(self.prog_path+'/data')
+
+        # delete .csv from file name + delete today file
+        files = [i[0:-4] for i in files if i != datetime.now().strftime('%d-%m-%Y')+'.csv']
+        return files
