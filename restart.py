@@ -11,7 +11,7 @@ from time import sleep
 
 def program(secs_of_sleep):
     if name == 'nt':
-        prog_path = path.dirname(__file__) + '/'
+        prog_path = path.dirname(__file__) + '\\'
     else:
         prog_path = '/home/pi/bot/'
     logging.info(f"Restart in {secs_of_sleep} seconds!")

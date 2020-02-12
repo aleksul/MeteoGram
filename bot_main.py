@@ -24,16 +24,18 @@ logging.info('Program started')
 
 graph = GRAPH()
 admin_id = ['196846654', '463145322']
-tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
+tkbot_token = '1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw'
+#tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
 kb_start = tg_api.KeyboardBuilder([['/now', '/graph'], ['/help']], one_time_keyboard=False)
 kb_start2 = tg_api.KeyboardBuilder([['/now'], ['/graph']], one_time_keyboard=False)
-kb_stat = tg_api.KeyboardBuilder([['/log']])
+kb_stat = tg_api.KeyboardBuilder([['/log', '/raw']])
+bt_month = tg_api.InlineButtonBuilder('Месяц', callback_data='+month')
 bt_day = tg_api.InlineButtonBuilder('День', callback_data='-day')
 bt_3h = tg_api.InlineButtonBuilder('3 часа', callback_data='+180')
 bt_1h = tg_api.InlineButtonBuilder('1 час', callback_data='+60')
 bt_30min = tg_api.InlineButtonBuilder('Полчаса', callback_data='+30')
 bt_15min = tg_api.InlineButtonBuilder('15 минут', callback_data='+15')
-kb_choose_time = tg_api.InlineMarkupBuilder([[bt_15min, bt_30min, bt_1h], [bt_3h, bt_day]])
+kb_choose_time = tg_api.InlineMarkupBuilder([[bt_15min, bt_30min, bt_1h], [bt_3h, bt_day], [bt_month]])
 
 
 async def repeat(interval, func, *args, **kwargs):
@@ -59,7 +61,9 @@ async def find_proxy():
     inet = Proxy(timeout=3,
                  site_to_test=f'https://api.telegram.org/bot{tkbot_token}/getMe',
                  filename=f'{path}proxy.txt')
-    results, _ = await asyncio.wait([inet.test1(), inet.test2()])
+    results, _ = await asyncio.wait([inet.test1(), inet.test2()], timeout=15)
+    if results is None:
+        return restart.program(5)
     results = [i.result() for i in results]
     logging.debug(results)
     if not results[-1]:  # internet connection test
@@ -107,7 +111,8 @@ async def logic(bot):
         elif message_text == '/help':
             asyncio.ensure_future(bot.send_message(user_id, 'Все чрезвычайно просто:\n'
                                                             '• для просмотра текущего состояния напиши /now\n'
-                                                            '• для построения графика напиши /graph',
+                                                            '• для построения графика напиши /graph\n \n'
+                                                            'Что такое частицы PM2.5 и PM10?',
                                                    reply_markup=kb_start2))
         elif message_text == '/now':
             date = datetime.now().strftime('%d-%m-%Y')
@@ -119,10 +124,10 @@ async def logic(bot):
             asyncio.ensure_future(bot.send_message(user_id, f'Температура: {temperature} °C\n'
                                                             f'Давление: {pressure} мм/рт.ст.\n'
                                                             f'Влажность: {humidity} %\n'
-                                                            f'Частицы PM2.5: {pm25} мгр/м³\n'
-                                                            f'Частицы PM10: {pm10} мгр/м³', ))
+                                                            f'Частицы PM2.5: {pm25} мкгр/м³\n'
+                                                            f'Частицы PM10: {pm10} мкгр/м³', ))
         elif message_text == '/graph':
-            asyncio.ensure_future(bot.send_message(user_id, 'Выберите время:',
+            asyncio.ensure_future(bot.send_message(user_id, 'Выберите временной промежуток:',
                                                    reply_markup=kb_choose_time))
         elif message_text == '/stat' and user_id in admin_id:
             asyncio.ensure_future(bot.send_message(user_id, f'Наконец то мой дорогой админ {user_name} '

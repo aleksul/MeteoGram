@@ -164,9 +164,9 @@ class GRAPH:
                 label.set_visible(False)
         plt.xlabel('Время')
         if parameter == 'PM2.5':
-            plt.ylabel('Частицы PM2.5, мгр/м³')
+            plt.ylabel('Частицы PM2.5, мкгр/м³')
         elif parameter == 'PM10':
-            plt.ylabel('Частицы PM10, мгр/м³')
+            plt.ylabel('Частицы PM10, мкгр/м³')
         elif parameter == 'Temp':
             plt.ylabel('Температура, °C')
         elif parameter == 'Pres':
@@ -239,9 +239,9 @@ class GRAPH:
         min_bar = plt.bar(x=x, height=y1, color='blue', width=-0.3, align='edge', label='Минимум')
         max_bar = plt.bar(x=x, height=y2, color='orange', width=0.3, align='edge', label='Максимум')
         if parameter == 'PM2.5':
-            plt.ylabel('Частицы PM2.5, мгр/м³')
+            plt.ylabel('Частицы PM2.5, мкгр/м³')
         elif parameter == 'PM10':
-            plt.ylabel('Частицы PM10, мгр/м³')
+            plt.ylabel('Частицы PM10, мкгр/м³')
         elif parameter == 'Temp':
             plt.ylabel('Температура, °C')
         elif parameter == 'Pres':

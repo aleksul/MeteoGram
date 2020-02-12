@@ -1,3 +1,4 @@
+import asyncio
 import aiohttp
 import logging
 import restart
@@ -58,6 +59,11 @@ class BotHandler:
                 assert resp.status == 200
         except AssertionError:
             logging.warning('Assertion error!')
+            await asyncio.sleep(1)
+            return await self.send_message(chat_id, text, parse_mode=parse_mode,
+                                           disable_notification=disable_notification,
+                                           reply_to_message_id=reply_to_message_id,
+                                           reply_markup=reply_markup)
         except Exception as err:
             logging.error(f"Send error: {type(err)}:{err}")
             return restart.program(1)
@@ -80,6 +86,8 @@ class BotHandler:
                 assert resp.status == 200
         except AssertionError:
             logging.warning('Assertion error!')
+            await asyncio.sleep(1)
+            return await self.send_photo(chat_id, read, reply_markup=reply_markup)
         except Exception as err:
             logging.error(f"Send photo error: {type(err)}:{err}")
             return restart.program(1)
@@ -100,6 +108,8 @@ class BotHandler:
                 assert resp.status == 200
         except AssertionError:
             logging.warning('Assertion error!')
+            await asyncio.sleep(1)
+            return await self.send_file(chat_id, file_path, reply_markup=reply_markup)
         except Exception as err:
             logging.error(f"Send photo error: {type(err)}:{err}")
             return restart.program(1)
