@@ -24,8 +24,7 @@ logging.info('Program started')
 
 graph = GRAPH()
 admin_id = ['196846654', '463145322']
-#tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
-tkbot_token = '1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw'
+tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
 kb_start = tg_api.KeyboardBuilder([['/now', '/graph'], ['/help']], one_time_keyboard=False)
 kb_start2 = tg_api.KeyboardBuilder([['/now'], ['/graph']], one_time_keyboard=False)
 kb_stat = tg_api.KeyboardBuilder([['/log']])
@@ -132,8 +131,7 @@ async def logic(bot):
         elif message_text == '/log' and user_id in admin_id:
             asyncio.ensure_future(bot.send_file(user_id, f'{path}bot.log', reply_markup=kb_start2))
     elif message_type == 'text':
-        print('pass')
-        pass
+        asyncio.ensure_future(bot.send_message(user_id, 'Данный тип данных не поддерживается'))
     elif message_type == 'callback_query':
         if data[0] == '+':
             bt_pm25 = tg_api.InlineButtonBuilder('Частицы PM2.5', callback_data='=PM2.5' + data)
@@ -172,7 +170,7 @@ async def logic(bot):
                                                          graph.read_csv(data[0], int(data[1])),
                                                          data[0])
                                                      ))
-            elif data[1] == 'day':
+            elif data[1] == 'day':  # one day
                 asyncio.ensure_future(bot.send_photo(user_id,
                                                      graph.plot_day(
                                                          graph.read_all_csv(data[0], data[2]),

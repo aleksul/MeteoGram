@@ -21,37 +21,44 @@ class GRAPH:
         else:
             self.prog_path = prog_path
 
-    async def get_info(self, session):
-        await asyncio.sleep(0)
-        '''
+    async def get_info(self, session, bad_requests=0):
         try:
             async with session.get(self.ip_add) as resp:
                 assert resp.status == 200
                 text = await resp.text()
-        except AssertionError:
-            logging.warning('Assertion error in getting info!')
-            return None
         except Exception as err:
             logging.error(f"Getting info from meteo error: {type(err)}:{err}")
-            return restart.program(1)
+            if bad_requests >= 4:
+                logging.critical('Too many bad requests with meteo')
+                return restart.program(1)
+            else:
+                logging.warning('Another one bad request meteo')
+                bad_requests += 1
+                return await self.get_info(session, bad_requests=bad_requests)
         else:
-            soup = BeautifulSoup(text, 'html.parser')
-            soup = soup.find_all('td', class_='r')
-            data_to_write = []
-            for i in range(len(soup) - 2):  # we don't need two last parameters (wifi)
-                i = soup[i].get_text()
-                i = i.replace(u'\xa0', u' ')  # change space to SPACE (I'm just normalizing the string)
-                i = i.split()  # separate value from measurement units
-                data_to_write.append(float(i.pop(0)))
-            data_to_write[3] = round(data_to_write[3] * 100 / 133, 2)  # hPa to mm Hg
-            file_path = self.csv_path()
-            data_to_write.append(datetime.now().strftime('%H:%M:%S'))  # adds time value
-            with open(file_path, 'a', newline='') as csv_file:
-                writer = csv.writer(csv_file, delimiter=',')
-                writer.writerow(data_to_write)
-            logging.debug('Wrote info to the file')
-            return True
-        '''
+            data = self.html_parser(text)
+            return self.csv_write(data)
+
+    def html_parser(self, text):
+        soup = BeautifulSoup(text, 'html.parser')
+        soup = soup.find_all('td', class_='r')
+        data_to_write = []
+        for i in range(len(soup) - 2):  # we don't need two last parameters (wifi)
+            i = soup[i].get_text()
+            i = i.replace(u'\xa0', u' ')  # change space to SPACE (I'm just normalizing the string)
+            i = i.split()  # separate value from measurement units
+            data_to_write.append(float(i.pop(0)))
+        data_to_write[3] = round(data_to_write[3] * 100 / 133, 2)  # hPa to mm Hg
+        data_to_write.append(datetime.now().strftime('%H:%M:%S'))  # adds time value
+        return data_to_write
+
+    def csv_write(self, data_to_write):
+        file_path = self.csv_path()
+        with open(file_path, 'a', newline='') as csv_file:
+            writer = csv.writer(csv_file, delimiter=',')
+            writer.writerow(data_to_write)
+        logging.debug('Wrote info to the file')
+        return None
 
     def csv_path(self, date=None, new_file=True):
         if date is None:
@@ -229,8 +236,8 @@ class GRAPH:
         y1 = [min(q1), min(q2), min(q3), min(q4)]
         y2 = [max(q1), max(q2), max(q3), max(q4)]
         x = ['Утро', 'День', 'Вечер', 'Ночь']
-        plt.bar(x=x, height=y1, color='blue', width=-0.4, align='edge')
-        plt.bar(x=x, height=y2, color='orange', width=0.4, aling='edge')
+        min_bar = plt.bar(x=x, height=y1, color='blue', width=-0.3, align='edge', label='Минимум')
+        max_bar = plt.bar(x=x, height=y2, color='orange', width=0.3, align='edge', label='Максимум')
         if parameter == 'PM2.5':
             plt.ylabel('Частицы PM2.5, мгр/м³')
         elif parameter == 'PM10':
@@ -244,12 +251,14 @@ class GRAPH:
         else:
             logging.error('Parameter is wrong!')
             return None
-        plt.title('Данные метеостанции в Точке Кипения г.Троицк')
+        plt.legend([min_bar, max_bar], ['Минимум', 'Максимум'],
+                   bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
+                   ncol=2, mode="expand", borderaxespad=0.)
+        plt.title('Данные метеостанции в Точке Кипения г.Троицк', pad=27)
         buf = BytesIO()
         plt.savefig(buf, format='png')
         buf.seek(0)
         buffer = buf.getvalue()
-        pass
         buf.close()
         plt.close()
         return buffer
