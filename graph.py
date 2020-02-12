@@ -1,11 +1,10 @@
 import asyncio
 import aiohttp
 import matplotlib.pyplot as plt
-#from matplotlib import dates
 from bs4 import BeautifulSoup
 import csv
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import restart
 from os import path, stat, name, remove, listdir
 from io import BytesIO
@@ -23,6 +22,8 @@ class GRAPH:
             self.prog_path = prog_path
 
     async def get_info(self, session):
+        await asyncio.sleep(0)
+        '''
         try:
             async with session.get(self.ip_add) as resp:
                 assert resp.status == 200
@@ -50,6 +51,7 @@ class GRAPH:
                 writer.writerow(data_to_write)
             logging.debug('Wrote info to the file')
             return True
+        '''
 
     def csv_path(self, date=None, new_file=True):
         if date is None:
@@ -73,9 +75,6 @@ class GRAPH:
         if date is None:
             date = datetime.now().strftime('%d-%m-%Y')
         file_path = self.csv_path(date=date, new_file=False)  # the name of file we will read
-        if file_path is None:
-            logging.error('No file!')
-            return None
         logging.debug(f'Reading file: {file_path}')
         with open(file_path, 'r') as f:
             reader = csv.DictReader(f)  # read the file as csv table
@@ -106,6 +105,23 @@ class GRAPH:
         else:
             return {'data': data_to_graph, 'time': time_to_graph}
 
+    def read_all_csv(self, parameter: str, date: str):
+        data_to_graph = []
+        time_to_graph = []
+        file_path = self.csv_path(date=date, new_file=False)
+        logging.debug(f'Reading all file: {file_path}')
+        with open(file_path, 'r') as f:
+            reader = csv.DictReader(f)  # read the file as csv table
+            read_list = list(reader)
+        for i in range(len(read_list)):  # read all the data
+            data_to_graph.append(
+                float(read_list[i][parameter])
+            )
+            time_to_graph.append(
+                read_list[i]['Time']
+            )
+        return {'data': data_to_graph, 'time': time_to_graph}
+
     def previous_date(self, date: str):  # receives date as 01-01-2020 and returns previous date as 31-12-2019
         date = date.split('-')
         date = datetime(int(date[2]), int(date[1]), int(date[0]))
@@ -131,7 +147,7 @@ class GRAPH:
         data = data['data']
         plt.plot(minutes, data, marker='.')
         plt.gcf().autofmt_xdate()
-        ax = plt.gca()
+        ax = plt.gca()  # gca stands for 'get current axis'
         labels_count = len(ax.xaxis.get_ticklabels())
         if labels_count > 15:
             for label in ax.xaxis.get_ticklabels()[::2]:
@@ -186,3 +202,54 @@ class GRAPH:
         # delete .csv from file name + delete today file
         files = [i[0:-4] for i in files if i != datetime.now().strftime('%d-%m-%Y')+'.csv']
         return files
+
+    def plot_day(self, data, parameter):
+        if data is None:
+            logging.error("Can't plot the graph, no data!")
+            return None
+        minutes = data['time']
+        data = data['data']
+        four_am = time(4, 0, 0)
+        ten_am = time(10, 0, 0)
+        four_pm = time(16, 0, 0)
+        ten_pm = time(22, 0, 0)
+        twelve_pm = time(0, 0, 0)
+        q1, q2, q3, q4 = [], [], [], []
+        for i in range(len(minutes)):
+            time_temp = minutes[i].split(':')
+            time_temp = time(int(time_temp[0]), int(time_temp[1]), int(time_temp[2]))
+            if four_am <= time_temp < ten_am:
+                q1.append(float(data[i]))  # morning
+            elif ten_am <= time_temp < four_pm:
+                q2.append(float(data[i]))  # day
+            elif four_pm <= time_temp < ten_pm:
+                q3.append(float(data[i]))  # evening
+            elif ten_pm <= time_temp or twelve_pm <= time_temp < four_am:
+                q4.append(float(data[i]))  # night
+        y1 = [min(q1), min(q2), min(q3), min(q4)]
+        y2 = [max(q1), max(q2), max(q3), max(q4)]
+        x = ['Утро', 'День', 'Вечер', 'Ночь']
+        plt.bar(x=x, height=y1, color='blue', width=-0.4, align='edge')
+        plt.bar(x=x, height=y2, color='orange', width=0.4, aling='edge')
+        if parameter == 'PM2.5':
+            plt.ylabel('Частицы PM2.5, мгр/м³')
+        elif parameter == 'PM10':
+            plt.ylabel('Частицы PM10, мгр/м³')
+        elif parameter == 'Temp':
+            plt.ylabel('Температура, °C')
+        elif parameter == 'Pres':
+            plt.ylabel('Давление, мм/рт.ст.')
+        elif parameter == 'Humidity':
+            plt.ylabel('Влажность, %')
+        else:
+            logging.error('Parameter is wrong!')
+            return None
+        plt.title('Данные метеостанции в Точке Кипения г.Троицк')
+        buf = BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        buffer = buf.getvalue()
+        pass
+        buf.close()
+        plt.close()
+        return buffer

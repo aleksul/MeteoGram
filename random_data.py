@@ -2,7 +2,7 @@ import random
 import csv
 import datetime
 
-file_path = 'P:/EOS bot/data' + '/' + '10-02-2020' + '.csv'
+file_path = 'P:/EOS bot/data' + '/' + '09-02-2020' + '.csv'
 #file_path = 'Z:/eos-tour-bot/data' + '/' + '08-02-2020' + '.csv'
 
 def new_file():
