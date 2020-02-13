@@ -8,35 +8,23 @@ import logging
 
 
 class Proxy:
-    def __init__(self, site_to_test='https://telegram.org', timeout=3, filename='/home/pi/bot/proxy.txt'):
+    def __init__(self, timeout=3, filename='/home/pi/bot/proxy.txt', site_to_test='http://example.org/'):
         self.site_to_test = site_to_test
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self.filename = filename
         self.proxies_num = 10
 
-    async def test1(self):
+    async def internet_check(self, site: str):
         try:
             async with aiohttp.request('GET',
-                                       'http://example.org/', timeout=self.timeout) as resp:
+                                       site, timeout=self.timeout) as resp:
                 assert resp.status == 200
-                logging.info(f"Internet seems to be connected. Response from example.org: {resp.status}")
+                logging.debug(f"Internet seems to be connected. Response from {site}: {resp.status}")
         except Exception as err:
-            logging.critical(f"Voila, the exception: {type(err)}:{err}")
-            return False
+            logging.warning(f"Site {site} does not work: {type(err)}:{err}")
+            return {'site': site, 'result': False}
         else:
-            return True
-
-    async def test2(self):
-        try:
-            async with aiohttp.request('GET',
-                                       self.site_to_test, timeout=self.timeout) as resp:
-                assert resp.status == 200
-                logging.info(f"Internet seems to be connected. Response from {self.site_to_test}: {resp.status}")
-        except Exception as err:
-            logging.warning(f"Site {self.site_to_test} doesn't work: {type(err)}:{err}")
-            return False
-        else:
-            return True
+            return {'site': site, 'result': True}
 
     async def broker_find(self):
         try:
@@ -53,7 +41,7 @@ class Proxy:
         else:
             # ProxyBroker returns a string with a lot of info, but we need only proxy
             proxy_temp = [str(i)[1:-1:].split()[4] for i in proxy_temp]
-            logging.info(f'Find proxies with ProxyBroker: {proxy_temp}')
+            logging.debug(f'Find proxies with ProxyBroker: {proxy_temp}')
             return await self.saver(proxy_temp)
 
     async def pub_find(self):
@@ -68,7 +56,7 @@ class Proxy:
             return None
         else:
             proxy_temp = proxy_temp.split("\n")
-            logging.info(f'Find 5 proxy: {proxy_temp}')
+            logging.debug(f'Find 5 proxy: {proxy_temp}')
             return await self.saver(proxy_temp)
 
     async def check(self, proxy: str, session):  # simply tests access to the site via proxy
@@ -122,16 +110,16 @@ class Proxy:
             return None
         with open(self.filename, "r") as f:  # Read the file and close it
             read_proxies = f.readlines()
-        logging.info('Everything is ok, opened the file...')
+        logging.debug('Everything is ok, opened the file with proxies...')
         read_proxies = [i[:-1:] for i in read_proxies]  # delete \n
         async with aiohttp.ClientSession() as session:  # it's better to use one session per all requests
             # check all the proxies in parallel mode
-            # use gather instead of wait because we need results in given order
+            # use gather instead of wait because we don't need results in given order
             checked_proxies = await asyncio.gather(*[(self.check(i, session)) for i in read_proxies])
         checked_proxies = [i for i in checked_proxies if i]  # delete all None's
         if checked_proxies:  # for the case, when all proxies are bad
             checked_proxies = sorted(checked_proxies, key=lambda m: m['ping'])  # sorts proxies to find the fastest
-            logging.info(f'Found fastest {checked_proxies[0]}sec')
+            logging.info(f'Found fastest proxy {checked_proxies[0]["proxy"]} with ping {checked_proxies[0]["ping"]}sec')
             # ...and after we don't need ping argument anymore... and http:// prefix too
             checked_proxies = [i.get('proxy')[7::] for i in checked_proxies]
             with open(self.filename, "w") as f:  # open file as "writable" to delete all the content first

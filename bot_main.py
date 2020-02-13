@@ -5,37 +5,10 @@ from inet import Proxy
 import tg_api
 from bot_handler import BotHandler
 import logging
-import restart
+from restart import restart
 from os import name, path
 from graph import GRAPH
 from datetime import datetime
-
-if name == 'nt':
-    path = path.dirname(__file__) + '/'
-else:
-    path = '/home/pi/bot/'
-
-logging.basicConfig(filename=f'{path}bot.log',
-                    format='%(asctime)s    %(levelname)s: %(message)s',
-                    datefmt='%d/%m/%Y %H:%M:%S',
-                    level=logging.INFO)
-
-logging.info('Program started')
-
-graph = GRAPH()
-admin_id = ['196846654', '463145322']
-tkbot_token = '1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw'
-#tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
-kb_start = tg_api.KeyboardBuilder([['/now', '/graph'], ['/help']], one_time_keyboard=False)
-kb_start2 = tg_api.KeyboardBuilder([['/now'], ['/graph']], one_time_keyboard=False)
-kb_stat = tg_api.KeyboardBuilder([['/log', '/raw']])
-bt_month = tg_api.InlineButtonBuilder('Месяц', callback_data='+month')
-bt_day = tg_api.InlineButtonBuilder('День', callback_data='-day')
-bt_3h = tg_api.InlineButtonBuilder('3 часа', callback_data='+180')
-bt_1h = tg_api.InlineButtonBuilder('1 час', callback_data='+60')
-bt_30min = tg_api.InlineButtonBuilder('Полчаса', callback_data='+30')
-bt_15min = tg_api.InlineButtonBuilder('15 минут', callback_data='+15')
-kb_choose_time = tg_api.InlineMarkupBuilder([[bt_15min, bt_30min, bt_1h], [bt_3h, bt_day], [bt_month]])
 
 
 async def repeat(interval, func, *args, **kwargs):
@@ -59,28 +32,30 @@ async def repeat(interval, func, *args, **kwargs):
 
 async def find_proxy():
     inet = Proxy(timeout=3,
-                 site_to_test=f'https://api.telegram.org/bot{tkbot_token}/getMe',
-                 filename=f'{path}proxy.txt')
-    results, _ = await asyncio.wait([inet.test1(), inet.test2()], timeout=15)
-    if results is None:
-        return restart.program(5)
-    results = [i.result() for i in results]
-    logging.debug(results)
-    if not results[-1]:  # internet connection test
-        return restart.program(5)
-    elif results[-2]:  # telegram without proxy connection test
+                 filename=f'{path}proxy.txt',
+                 site_to_test=f'https://api.telegram.org/bot{tkbot_token}/getMe')
+    results_temp = await asyncio.gather(inet.internet_check('http://example.org/'),
+                                        inet.internet_check(f'https://api.telegram.org/bot{tkbot_token}/getMe'))
+    if results_temp[0]['site'] == 'http://example.org/':
+        results = [results_temp[0]['result'], results_temp[1]['result']]
+    else:
+        results = [results_temp[1]['result'], results_temp[0]['result']]
+    logging.info(f'Internet test results: {results[0]}, {results[1]}')
+    if not results[0]:  # internet connection test
+        return restarter.program(5)
+    elif results[1]:  # telegram without proxy connection test
         return None
     else:
-        results, _ = await asyncio.wait([inet.loader(), inet.broker_find(), inet.pub_find()])
-        results = [i.result() for i in results]
-        if results[-1]:
-            return results[-1]
-        elif results[-2]:
-            return results[-2]
-        elif results[-3]:
-            return results[-3]
+        result = await inet.loader()
+        if result:
+            return result
         else:
-            return restart.program(1)
+            results, _ = await asyncio.wait([inet.broker_find(), inet.pub_find()])
+        results = [i.result() for i in results if i.result() is not None]
+        if results:
+            return results[-1]
+        else:
+            return restarter.program(1)
 
 
 async def logic(bot):
@@ -101,6 +76,8 @@ async def logic(bot):
                 message_type = 'command'
     logging.debug(f'Message type: {message_type}')
     user_id = str(received_message['chat']['id'])
+    if message_type == 'command' and user_id in admin_id and message_text[1] == '/':
+        message_type = 'admin_command'
     user_name = received_message['chat']['first_name']
     if message_type == 'command':
         if message_text == '/start':
@@ -129,12 +106,29 @@ async def logic(bot):
         elif message_text == '/graph':
             asyncio.ensure_future(bot.send_message(user_id, 'Выберите временной промежуток:',
                                                    reply_markup=kb_choose_time))
-        elif message_text == '/stat' and user_id in admin_id:
+
+    elif message_type == 'admin_command':
+        if message_text == '//stat':
             asyncio.ensure_future(bot.send_message(user_id, f'Наконец то мой дорогой админ {user_name} '
                                                             f'добрался до статистики! Что интересует?',
-                                                   reply_markup=kb_stat))
-        elif message_text == '/log' and user_id in admin_id:
+                                                   reply_markup=kb_admin))
+        elif message_text == '//log':
             asyncio.ensure_future(bot.send_file(user_id, f'{path}bot.log', reply_markup=kb_start2))
+        elif message_text == '//reboot':
+            await bot.send_message(user_id, 'Перезагружаюсь...')
+            restarter.program(1)
+        elif message_text == '//raw':
+            keyboard = [[]]
+            strings_num = 0
+            for i in graph.dates():
+                if len(keyboard[strings_num]) > 2:
+                    keyboard.append([])
+                    strings_num += 1
+                keyboard[strings_num].append(
+                    tg_api.InlineButtonBuilder(i, callback_data='-raw+' + i)
+                )
+            asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
+                                                   reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
     elif message_type == 'text':
         asyncio.ensure_future(bot.send_message(user_id, 'Данный тип данных не поддерживается'))
     elif message_type == 'callback_query':
@@ -152,7 +146,7 @@ async def logic(bot):
                 keyboard = [[]]
                 strings_num = 0
                 for i in graph.dates():
-                    if len(keyboard[strings_num]) > 4:
+                    if len(keyboard[strings_num]) > 2:
                         keyboard.append([])
                         strings_num += 1
                     keyboard[strings_num].append(
@@ -160,6 +154,10 @@ async def logic(bot):
                     )
                 asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
                                                        reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
+            if data.split('+')[0] == '-raw':
+                asyncio.ensure_future(bot.send_file(user_id,
+                                                    path+'/'+'data'+'/'+data.split('+')[1]+'.csv',
+                                                    reply_markup=kb_start2))
 
         elif data[0] == '=':
             data = data[1:].split('+')
@@ -186,21 +184,55 @@ async def logic(bot):
         asyncio.ensure_future(bot.send_message(user_id, 'Данный тип данных не поддерживается'))
 
 
-async def main(best_proxy):
+async def main(best_proxy: str, restarter: object):
     logging.info('Main started!')
     session = aiohttp.ClientSession()
-    tg_bot = BotHandler(tkbot_token, session, best_proxy)
+    tg_bot = BotHandler(tkbot_token, session, restarter, best_proxy)
     t1 = asyncio.ensure_future(repeat(0, logic, tg_bot))
     t2 = asyncio.ensure_future(repeat(60, graph.get_info, session))
     await t1
     await t2
 
 
-if __name__ == '__main__':
-    ioloop = asyncio.get_event_loop()
-    proxy = ioloop.run_until_complete(find_proxy())
-    if proxy:
-        proxy = f'http://{proxy}'
-    ioloop.create_task(main(proxy))
-    ioloop.run_forever()
-    ioloop.close()
+#if __name__ == '__main__':
+if name == 'nt':
+    path = path.dirname(__file__) + '/'
+else:
+    path = '/home/pi/bot/'
+
+logging.basicConfig(filename=f'{path}bot.log',
+                    format='%(asctime)s    %(levelname)s: %(message)s',
+                    datefmt='%d/%m/%Y %H:%M:%S',
+                    level=logging.INFO)
+logging.info('Program started')
+
+admin_id = ['196846654', '463145322']
+
+tkbot_token = '1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw'
+# tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
+
+kb_start = tg_api.KeyboardBuilder([['/now', '/graph'], ['/help']], one_time_keyboard=False)
+kb_start2 = tg_api.KeyboardBuilder([['/now'], ['/graph']], one_time_keyboard=False)
+kb_admin = tg_api.KeyboardBuilder([['//log', '//raw'], ['//reboot']])
+bt_month = tg_api.InlineButtonBuilder('Месяц', callback_data='+month')
+bt_day = tg_api.InlineButtonBuilder('День', callback_data='-day')
+bt_3h = tg_api.InlineButtonBuilder('3 часа', callback_data='+180')
+bt_1h = tg_api.InlineButtonBuilder('1 час', callback_data='+60')
+bt_30min = tg_api.InlineButtonBuilder('Полчаса', callback_data='+30')
+bt_15min = tg_api.InlineButtonBuilder('15 минут', callback_data='+15')
+kb_choose_time = tg_api.InlineMarkupBuilder([[bt_15min, bt_30min, bt_1h], [bt_3h, bt_day], [bt_month]])
+
+print(1)
+ioloop = asyncio.get_event_loop()
+print(2)
+restarter = restart(ioloop)
+task = ioloop.create_task(find_proxy())
+print(4)
+proxy = ioloop.run_until_complete(task)
+print(3)
+if proxy:
+    proxy = f'http://{proxy}'
+future = ioloop.create_future()
+ioloop.create_task(main(proxy, restarter))
+ioloop.run_forever()
+ioloop.close()

@@ -1,12 +1,11 @@
 import asyncio
 import aiohttp
 import logging
-import restart
 
 
 class BotHandler:
 
-    def __init__(self, token, session, proxy=None, timeout=20):
+    def __init__(self, token, session, restarter: object, proxy=None, timeout=20):
         self.token = token
         self.session = session
         self.proxy = proxy
@@ -14,6 +13,7 @@ class BotHandler:
         self.tg_timeout = timeout
         self.api_url = f"https://api.telegram.org/bot{token}/"
         self.offset = None
+        self.restarter = restarter
 
     async def get_updates(self):
         params = {'timeout': self.tg_timeout}
@@ -66,7 +66,7 @@ class BotHandler:
                                            reply_markup=reply_markup)
         except Exception as err:
             logging.error(f"Send error: {type(err)}:{err}")
-            return restart.program(1)
+            return self.restarter.restart(1)
         else:
             return None
 
@@ -90,7 +90,7 @@ class BotHandler:
             return await self.send_photo(chat_id, read, reply_markup=reply_markup)
         except Exception as err:
             logging.error(f"Send photo error: {type(err)}:{err}")
-            return restart.program(1)
+            return self.restarter.restart(1)
         else:
             return None
 
@@ -112,6 +112,6 @@ class BotHandler:
             return await self.send_file(chat_id, file_path, reply_markup=reply_markup)
         except Exception as err:
             logging.error(f"Send photo error: {type(err)}:{err}")
-            return restart.program(1)
+            return self.restarter.restart(1)
         else:
             return None

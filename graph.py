@@ -5,17 +5,16 @@ from bs4 import BeautifulSoup
 import csv
 import logging
 from datetime import datetime, timedelta, time
-import restart
 from os import path, stat, name, remove, listdir
 from io import BytesIO
 
 
 class GRAPH:
-    def __init__(self, ip='192.168.0.175', prog_path=None):
+    def __init__(self, restarter, ip='192.168.0.175', prog_path=None):
         self.ip_add = 'http://' + ip + '/values'
         if prog_path is None:
             if name == 'nt':
-                self.prog_path = path.dirname(__file__) + '/'
+                self.prog_path = path.dirname(__file__) + '\\'
             else:
                 self.prog_path = '/home/pi/bot/'
         else:
@@ -196,7 +195,7 @@ class GRAPH:
         for i in range(3, len(data_temp), 3):
             avg = round((data_temp[i-2]+data_temp[i-1]+data_temp[i])/3, 2)
             data_to_graph.append(avg)
-            minutes_to_graph.append(minutes_temp[i])
+            minutes_to_graph.append(minutes_temp[i-1])
         data_return = dict(data=data_to_graph, time=minutes_to_graph)
         return self.plot_minutes(data_return, parameter)
 
