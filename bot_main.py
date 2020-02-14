@@ -5,7 +5,7 @@ from inet import Proxy
 import tg_api
 from bot_handler import BotHandler
 import logging
-from restart import restart
+import restart
 from os import name, path
 from graph import GRAPH
 from datetime import datetime
@@ -42,7 +42,7 @@ async def find_proxy():
         results = [results_temp[1]['result'], results_temp[0]['result']]
     logging.info(f'Internet test results: {results[0]}, {results[1]}')
     if not results[0]:  # internet connection test
-        return restarter.program(5)
+        raise restart.InternetConnectionError
     elif results[1]:  # telegram without proxy connection test
         return None
     else:
@@ -55,7 +55,7 @@ async def find_proxy():
         if results:
             return results[-1]
         else:
-            return restarter.program(1)
+            raise restart.InternetConnectionError
 
 
 async def logic(bot):
@@ -74,10 +74,10 @@ async def logic(bot):
             message_text = received_message['text']
             if message_text[0] == '/':
                 message_type = 'command'
-    logging.debug(f'Message type: {message_type}')
     user_id = str(received_message['chat']['id'])
     if message_type == 'command' and user_id in admin_id and message_text[1] == '/':
         message_type = 'admin_command'
+    logging.debug(f'Message type: {message_type}')
     user_name = received_message['chat']['first_name']
     if message_type == 'command':
         if message_text == '/start':
@@ -116,7 +116,7 @@ async def logic(bot):
             asyncio.ensure_future(bot.send_file(user_id, f'{path}bot.log', reply_markup=kb_start2))
         elif message_text == '//reboot':
             await bot.send_message(user_id, 'Перезагружаюсь...')
-            restarter.program(1)
+            raise restart.UserRestart
         elif message_text == '//raw':
             keyboard = [[]]
             strings_num = 0
@@ -184,55 +184,52 @@ async def logic(bot):
         asyncio.ensure_future(bot.send_message(user_id, 'Данный тип данных не поддерживается'))
 
 
-async def main(best_proxy: str, restarter: object):
-    logging.info('Main started!')
+async def main(best_proxy: str):
     session = aiohttp.ClientSession()
-    tg_bot = BotHandler(tkbot_token, session, restarter, best_proxy)
+    tg_bot = BotHandler(tkbot_token, session, best_proxy)
     t1 = asyncio.ensure_future(repeat(0, logic, tg_bot))
     t2 = asyncio.ensure_future(repeat(60, graph.get_info, session))
     await t1
     await t2
 
 
-#if __name__ == '__main__':
-if name == 'nt':
-    path = path.dirname(__file__) + '/'
-else:
-    path = '/home/pi/bot/'
+if __name__ == '__main__':
+    if name == 'nt':
+        path = path.dirname(__file__) + '/'
+    else:
+        path = '/home/pi/bot/'
 
-logging.basicConfig(filename=f'{path}bot.log',
-                    format='%(asctime)s    %(levelname)s: %(message)s',
-                    datefmt='%d/%m/%Y %H:%M:%S',
-                    level=logging.INFO)
-logging.info('Program started')
+    logging.basicConfig(filename=f'{path}bot.log',
+                        format='%(asctime)s    %(levelname)s: %(message)s',
+                        datefmt='%d/%m/%Y %H:%M:%S',
+                        level=logging.DEBUG)
+    logging.info('Program started')
 
-admin_id = ['196846654', '463145322']
+    admin_id = ['196846654', '463145322']
 
-tkbot_token = '1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw'
-# tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
+    tkbot_token = '1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw'
+    # tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
 
-kb_start = tg_api.KeyboardBuilder([['/now', '/graph'], ['/help']], one_time_keyboard=False)
-kb_start2 = tg_api.KeyboardBuilder([['/now'], ['/graph']], one_time_keyboard=False)
-kb_admin = tg_api.KeyboardBuilder([['//log', '//raw'], ['//reboot']])
-bt_month = tg_api.InlineButtonBuilder('Месяц', callback_data='+month')
-bt_day = tg_api.InlineButtonBuilder('День', callback_data='-day')
-bt_3h = tg_api.InlineButtonBuilder('3 часа', callback_data='+180')
-bt_1h = tg_api.InlineButtonBuilder('1 час', callback_data='+60')
-bt_30min = tg_api.InlineButtonBuilder('Полчаса', callback_data='+30')
-bt_15min = tg_api.InlineButtonBuilder('15 минут', callback_data='+15')
-kb_choose_time = tg_api.InlineMarkupBuilder([[bt_15min, bt_30min, bt_1h], [bt_3h, bt_day], [bt_month]])
-
-print(1)
-ioloop = asyncio.get_event_loop()
-print(2)
-restarter = restart(ioloop)
-task = ioloop.create_task(find_proxy())
-print(4)
-proxy = ioloop.run_until_complete(task)
-print(3)
-if proxy:
-    proxy = f'http://{proxy}'
-future = ioloop.create_future()
-ioloop.create_task(main(proxy, restarter))
-ioloop.run_forever()
-ioloop.close()
+    kb_start = tg_api.KeyboardBuilder([['/now', '/graph'], ['/help']], one_time_keyboard=False)
+    kb_start2 = tg_api.KeyboardBuilder([['/now'], ['/graph']], one_time_keyboard=False)
+    kb_admin = tg_api.KeyboardBuilder([['//log', '//raw'], ['//reboot']])
+    bt_month = tg_api.InlineButtonBuilder('Месяц', callback_data='+month')
+    bt_day = tg_api.InlineButtonBuilder('День', callback_data='-day')
+    bt_3h = tg_api.InlineButtonBuilder('3 часа', callback_data='+180')
+    bt_1h = tg_api.InlineButtonBuilder('1 час', callback_data='+60')
+    bt_30min = tg_api.InlineButtonBuilder('Полчаса', callback_data='+30')
+    bt_15min = tg_api.InlineButtonBuilder('15 минут', callback_data='+15')
+    kb_choose_time = tg_api.InlineMarkupBuilder([[bt_15min, bt_30min, bt_1h], [bt_3h, bt_day], [bt_month]])
+    graph = GRAPH()
+    ioloop = asyncio.get_event_loop()
+    #ioloop.set_exception_handler(handle_exception)
+    try:
+        proxy = ioloop.run_until_complete(find_proxy())
+        if proxy:
+            proxy = f'http://{proxy}'
+        future = ioloop.create_future()
+        ioloop.create_task(main(proxy))
+        ioloop.run_forever()
+    finally:
+        ioloop.close()
+        restart.program(1)

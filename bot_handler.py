@@ -1,11 +1,11 @@
 import asyncio
 import aiohttp
 import logging
+from restart import SendError, GetUpdatesError
 
 
 class BotHandler:
-
-    def __init__(self, token, session, restarter: object, proxy=None, timeout=20):
+    def __init__(self, token, session, proxy=None, timeout=20):
         self.token = token
         self.session = session
         self.proxy = proxy
@@ -13,9 +13,8 @@ class BotHandler:
         self.tg_timeout = timeout
         self.api_url = f"https://api.telegram.org/bot{token}/"
         self.offset = None
-        self.restarter = restarter
 
-    async def get_updates(self):
+    async def get_updates(self, bad_updates=0):
         params = {'timeout': self.tg_timeout}
         if self.offset:
             params.update(offset=self.offset)
@@ -28,7 +27,12 @@ class BotHandler:
                 result = result['result']
         except Exception as err:
             logging.error(f"Pull error: {type(err)}:{err}")
-            return None
+            if bad_updates >= 5:
+                logging.critical('Too many bad updates!')
+                raise GetUpdatesError
+            else:
+                bad_updates += 1
+                return await self.get_updates(bad_updates=bad_updates)
         else:
             if result:
                 self.offset = int(result[0]['update_id'])+1
@@ -42,7 +46,8 @@ class BotHandler:
                            parse_mode='Markdown',  # can be "HTML"
                            disable_notification=None,  # boolean
                            reply_to_message_id=None,  # integer
-                           reply_markup=None):
+                           reply_markup=None,
+                           bad_asserts=0):
         dictionary = dict(chat_id=chat_id, text=text)
         if parse_mode != 'Markdown':
             dictionary.update(parse_mode=parse_mode)
@@ -59,18 +64,24 @@ class BotHandler:
                 assert resp.status == 200
         except AssertionError:
             logging.warning('Assertion error!')
-            await asyncio.sleep(1)
-            return await self.send_message(chat_id, text, parse_mode=parse_mode,
-                                           disable_notification=disable_notification,
-                                           reply_to_message_id=reply_to_message_id,
-                                           reply_markup=reply_markup)
+            if bad_asserts >= 3:
+                logging.critical('Too many bad asserts!')
+                raise SendError
+            else:
+                bad_asserts += 1
+                await asyncio.sleep(1)
+                return await self.send_message(chat_id, text, parse_mode=parse_mode,
+                                               disable_notification=disable_notification,
+                                               reply_to_message_id=reply_to_message_id,
+                                               reply_markup=reply_markup,
+                                               bad_asserts=bad_asserts)
         except Exception as err:
-            logging.error(f"Send error: {type(err)}:{err}")
-            return self.restarter.restart(1)
+            logging.critical(f"Send error: {type(err)}:{err}")
+            raise SendError
         else:
             return None
 
-    async def send_photo(self, chat_id, read, reply_markup=None):
+    async def send_photo(self, chat_id, read, reply_markup=None, bad_asserts=0):
         '''
         with open(photo_path, 'rb') as f:  # use this to open photo file
             read = f.read()
@@ -86,15 +97,20 @@ class BotHandler:
                 assert resp.status == 200
         except AssertionError:
             logging.warning('Assertion error!')
-            await asyncio.sleep(1)
-            return await self.send_photo(chat_id, read, reply_markup=reply_markup)
+            if bad_asserts >= 3:
+                logging.critical('Too many bad asserts!')
+                raise SendError
+            else:
+                bad_asserts += 1
+                await asyncio.sleep(1)
+                return await self.send_photo(chat_id, read, reply_markup=reply_markup, bad_asserts=bad_asserts)
         except Exception as err:
-            logging.error(f"Send photo error: {type(err)}:{err}")
-            return self.restarter.restart(1)
+            logging.critical(f"Send photo error: {type(err)}:{err}")
+            raise SendError
         else:
             return None
 
-    async def send_file(self, chat_id, file_path, reply_markup=None):
+    async def send_file(self, chat_id, file_path, reply_markup=None, bad_asserts=0):
         with open(file_path, 'rb') as f:
             read = f.read()
         params = dict(chat_id=chat_id)
@@ -108,10 +124,15 @@ class BotHandler:
                 assert resp.status == 200
         except AssertionError:
             logging.warning('Assertion error!')
-            await asyncio.sleep(1)
-            return await self.send_file(chat_id, file_path, reply_markup=reply_markup)
+            if bad_asserts >= 3:
+                logging.critical('Too many bad asserts!')
+                raise SendError
+            else:
+                bad_asserts += 1
+                await asyncio.sleep(1)
+                return await self.send_file(chat_id, file_path, reply_markup=reply_markup, bad_asserts=bad_asserts)
         except Exception as err:
-            logging.error(f"Send photo error: {type(err)}:{err}")
-            return self.restarter.restart(1)
+            logging.critical(f"Send photo error: {type(err)}:{err}")
+            raise SendError
         else:
             return None

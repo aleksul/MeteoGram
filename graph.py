@@ -7,10 +7,10 @@ import logging
 from datetime import datetime, timedelta, time
 from os import path, stat, name, remove, listdir
 from io import BytesIO
-
+from restart import MeteoError
 
 class GRAPH:
-    def __init__(self, restarter, ip='192.168.0.175', prog_path=None):
+    def __init__(self, ip='192.168.0.175', prog_path=None):
         self.ip_add = 'http://' + ip + '/values'
         if prog_path is None:
             if name == 'nt':
@@ -27,9 +27,10 @@ class GRAPH:
                 text = await resp.text()
         except Exception as err:
             logging.error(f"Getting info from meteo error: {type(err)}:{err}")
-            if bad_requests >= 4:
+            if bad_requests >= 5:
                 logging.critical('Too many bad requests with meteo')
-                return restart.program(1)
+                await asyncio.sleep(5)
+                raise MeteoError
             else:
                 logging.warning('Another one bad request meteo')
                 bad_requests += 1
