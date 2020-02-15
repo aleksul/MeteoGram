@@ -97,8 +97,9 @@ async def logic(bot):
         elif message_text == '/help':
             asyncio.ensure_future(bot.send_message(user_id, 'Все чрезвычайно просто:\n'
                                                             '• для просмотра текущего состояния напиши /now\n'
-                                                            '• для построения графика напиши /graph\n \n'
-                                                            'Что такое частицы PM2.5 и PM10?',
+                                                            '• для построения графика напиши /graph\n\n'
+                                                            'Интересуют подробности отображаемых измерений?\n'
+                                                            'Напиши /info',
                                                    reply_markup=kb_start2))
         elif message_text == '/now':
             date = datetime.now().strftime('%d-%m-%Y')
@@ -115,6 +116,21 @@ async def logic(bot):
         elif message_text == '/graph':
             asyncio.ensure_future(bot.send_message(user_id, 'Выберите временной промежуток:',
                                                    reply_markup=kb_choose_time))
+        elif message_text == '/info':
+            asyncio.ensure_future(bot.send_message(user_id, 'Где производится замер?\n'
+                                                            'Метеостанция располгается по адресу: г.Москва, г.Троицк, '
+                                                            'Сиреневый бульвар, д.1, снаружи "Точки Кипения"\n\n'
+                                                            'Что такое частицы PM2.5 и PM10?\n'
+                                                            'Это мелкодисперсные частицы пыли, которые, '
+                                                            'буквально, "витают в воздухе". '
+                                                            'Из-за их малых размеров (2.5 мкм и 10 мкм соответсвенно) '
+                                                            'и веса они практически не осядают, таким образом загрязняя'
+                                                            ' воздух, которым мы дышим.\n'
+                                                            'Согласно ВОЗ, среднесуточный уровень этих частиц '
+                                                            'не должен быть больше 25 мкгр/м³\n'
+                                                            'Подробнее можно прочитать, например, здесь:\n'
+                                                            'https://habr.com/ru/company/tion/blog/396111/',
+                                                   reply_markup=kb_start2))
         else:
             asyncio.ensure_future(bot.send_message(user_id, 'Неверная команда!\nДля вывода подсказки напишите /help'))
 
@@ -178,7 +194,7 @@ async def logic(bot):
                     )
                 asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
                                                        reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
-            if data.split('+')[0] == '-raw':
+            elif data.split('+')[0] == '-raw':
                 asyncio.ensure_future(bot.send_file(user_id,
                                                     path+'/'+'data'+'/'+data.split('+')[1]+'.csv',
                                                     reply_markup=kb_start2))
@@ -203,6 +219,12 @@ async def logic(bot):
                                                          graph.read_all_csv(data[0], data[2]),
                                                          data[0])
                                                      ))
+            elif data[1] == 'month':  # month
+                asyncio.ensure_future(bot.send_photo(user_id,
+                                                     graph.plot_month(
+                                                         graph.read_month(data[0]),
+                                                         data[0]
+                                                     )))
 
     else:
         asyncio.ensure_future(bot.send_message(user_id, 'Данный тип данных не поддерживается'))
@@ -229,7 +251,7 @@ if __name__ == '__main__':
     logging.basicConfig(filename=f'{path}bot.log',
                         format='%(asctime)s    %(levelname)s: %(message)s',
                         datefmt='%d/%m/%Y %H:%M:%S',
-                        level=logging.DEBUG)
+                        level=logging.INFO)
     logging.info('Program started')
 
     ADMIN_ID = ['196846654', '463145322']

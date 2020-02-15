@@ -4,8 +4,8 @@ Note: this function does not return.
 Any cleanup action (like saving data) must be done before calling this function.
 """
 import logging
-from os import execl, name, path, spawnv, P_NOWAIT
-import sys
+from os import name, path, spawnv, P_NOWAIT
+from sys import executable, argv
 from time import sleep
 
 
@@ -40,12 +40,7 @@ def program(secs_of_sleep):
         prog_path = '/home/pi/bot/'
     logging.info(f"Restart in {secs_of_sleep} seconds!")
     sleep(secs_of_sleep)
-    if name == 'nt':
-        logging.info('Restart on Windows')
-        #exec(open(prog_path+'bot_main.py').read())
-        spawnv(P_NOWAIT, sys.executable, [sys.executable, prog_path+'bot_main.py', *sys.argv])
-        exit()
-    else:
-        logging.info(f'Restart on {name}')
-        python = sys.executable
-        execl(python, python, *sys.argv)
+    logging.info(f'Restart on {name}')
+    python = executable
+    spawnv(P_NOWAIT, python, [python, prog_path+'bot_main.py', *argv])
+    exit()

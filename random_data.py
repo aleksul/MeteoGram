@@ -3,8 +3,11 @@ import csv
 from datetime import datetime, timedelta
 from os import name, path
 
+file_path = ''
+
 
 def new_file(date=None):
+    global file_path
     if name == 'nt':
         prog_path = path.dirname(__file__) + '\\'
     else:
@@ -19,6 +22,7 @@ def new_file(date=None):
 
 
 def data_writer(i):
+    global file_path
     time = datetime(2020, 1, 1, 0, 0, 0)
     delta = timedelta(minutes=1)
     for i in range(i):

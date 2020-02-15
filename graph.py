@@ -60,7 +60,7 @@ class GRAPH:
         logging.debug('Wrote info to the file')
         return None
 
-    def csv_path(self, date=None, new_file=True):
+    def csv_path(self, date=None, new_file=True, bad_tries=0):
         if date is None:
             date = datetime.now().strftime('%d-%m-%Y')
         file_path = self.prog_path + 'data/' + date + '.csv'
@@ -72,8 +72,13 @@ class GRAPH:
                     writer.writerow(['PM2.5', 'PM10', 'Temp', 'Pres', 'Humidity', 'Time'])
                 self.delete_old()  # call deleter every time we write new file
             else:
-                logging.debug("Didn't find anything, try previous date")
-                return self.csv_path(self.previous_date(date), new_file=False)  # call the function until find the file
+                if bad_tries >= 5:
+                    logging.warning('Did NOT file the file, so we will create new')
+                    return self.csv_path()
+                else:
+                    bad_tries += 1
+                    logging.debug("Didn't find anything, try previous date")
+                    return self.csv_path(self.previous_date(date), new_file=False, bad_tries=bad_tries)
         return file_path
 
     def read_csv(self, parameter: str, minutes: int, date=None, previous_data=None, previous_time=None):
@@ -128,6 +133,28 @@ class GRAPH:
                 read_list[i]['Time']
             )
         return {'data': data_to_graph, 'time': time_to_graph}
+
+    def read_month(self, parameter: str):
+        if name == 'nt':
+            files = listdir(self.prog_path+'\\data')
+        else:
+            files = listdir(self.prog_path+'/data')
+        files = [i[0:-4] for i in files]  # delete .csv from file name
+        temp_list = []
+        for i in files:
+            temp = i.split('-')
+            temp = datetime(int(temp[2]), int(temp[1]), int(temp[0]))  # make all dates datetime objects to sort them
+            temp_list.append(temp)
+        files = temp_list
+        files.sort()
+        files = [i.strftime('%d-%m-%Y') for i in files]  # and make them strings again
+        max_list = []
+        min_list = []
+        for i in files:
+            read_day = self.read_all_csv(parameter, i)
+            max_list.append(max(read_day['data']))
+            min_list.append(min(read_day['data']))
+        return {'min': min_list, 'max': max_list, 'dates': files}
 
     def previous_date(self, date: str):  # receives date as 01-01-2020 and returns previous date as 31-12-2019
         date = date.split('-')
@@ -210,7 +237,7 @@ class GRAPH:
         files = [i[0:-4] for i in files if i != datetime.now().strftime('%d-%m-%Y')+'.csv']
         return files
 
-    def plot_day(self, data, parameter):
+    def plot_day(self, data: dict, parameter: str):
         if data is None:
             logging.error("Can't plot the graph, no data!")
             return None
@@ -233,6 +260,8 @@ class GRAPH:
                 q3.append(float(data[i]))  # evening
             elif ten_pm <= time_temp or twelve_pm <= time_temp < four_am:
                 q4.append(float(data[i]))  # night
+        if not q1 or not q2 or not q3 or not q4:  # if we have no data for time period in this file
+            return None
         y1 = [min(q1), min(q2), min(q3), min(q4)]
         y2 = [max(q1), max(q2), max(q3), max(q4)]
         x = ['Утро', 'День', 'Вечер', 'Ночь']
@@ -252,6 +281,47 @@ class GRAPH:
             logging.error('Parameter is wrong!')
             return None
         plt.legend([min_bar, max_bar], ['Минимум', 'Максимум'],
+                   bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
+                   ncol=2, mode="expand", borderaxespad=0.)
+        plt.title('Данные метеостанции в Точке Кипения г.Троицк', pad=27)
+        buf = BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        buffer = buf.getvalue()
+        buf.close()
+        plt.close()
+        return buffer
+
+    def plot_month(self, data: dict, parameter: str):
+        if data is None:
+            logging.error("Can't plot the graph, no data!")
+            return None
+        min_list = data['min']
+        max_list = data['max']
+        dates = data['dates']
+        min_line, = plt.plot(dates, min_list, marker='.', color='blue', label='Минимум')
+        max_line, = plt.plot(dates, max_list, marker='.', color='orange', label='Максимум')
+        plt.gcf().autofmt_xdate()
+        ax = plt.gca()  # gca stands for 'get current axis'
+        labels_count = len(ax.xaxis.get_ticklabels())
+        if labels_count > 15:
+            for label in ax.xaxis.get_ticklabels()[::2]:
+                label.set_visible(False)
+        plt.xlabel('Дни')
+        if parameter == 'PM2.5':
+            plt.ylabel('Частицы PM2.5, мкгр/м³')
+        elif parameter == 'PM10':
+            plt.ylabel('Частицы PM10, мкгр/м³')
+        elif parameter == 'Temp':
+            plt.ylabel('Температура, °C')
+        elif parameter == 'Pres':
+            plt.ylabel('Давление, мм/рт.ст.')
+        elif parameter == 'Humidity':
+            plt.ylabel('Влажность, %')
+        else:
+            logging.error('Parameter is wrong!')
+            return None
+        plt.legend([min_line, max_line], ['Минимум', 'Максимум'],
                    bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
                    ncol=2, mode="expand", borderaxespad=0.)
         plt.title('Данные метеостанции в Точке Кипения г.Троицк', pad=27)
