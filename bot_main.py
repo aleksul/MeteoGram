@@ -1,8 +1,8 @@
 #!/usr/bin/python3.6
 import asyncio
 import aiohttp
-from inet import Proxy
 import tg_api
+from inet import Proxy
 from bot_handler import BotHandler
 import logging
 import restart
@@ -21,13 +21,19 @@ async def repeat(interval, func, *args, **kwargs):
     """
     if interval == 0:
         while True:
-            await func(*args, **kwargs)
+            try:
+                await func(*args, **kwargs)
+            except Exception as err1:
+                raise err1
     else:
         while True:
-            await asyncio.gather(
-                func(*args, **kwargs),
-                asyncio.sleep(interval),
-            )
+            try:
+                await asyncio.gather(
+                    func(*args, **kwargs),
+                    asyncio.sleep(interval),
+                )
+            except Exception as err2:
+                raise err2
 
 
 async def find_proxy():
@@ -62,21 +68,24 @@ async def logic(bot):
     update = await bot.get_updates()
     if update is None:
         return None
+    global RESTART_FLAG
     logging.debug("New message!")
     if 'callback_query' in update.keys():
         received_message = update['callback_query']['message']
         message_type = 'callback_query'
         data = update['callback_query']['data']
+        user_id = str(received_message['chat']['id'])
     else:
         received_message = update['message']
+        user_id = str(received_message['chat']['id'])
         message_type = list(received_message.keys())[4]
         if message_type == 'text':
             message_text = received_message['text']
             if message_text[0] == '/':
                 message_type = 'command'
-    user_id = str(received_message['chat']['id'])
-    if message_type == 'command' and user_id in admin_id and message_text[1] == '/':
-        message_type = 'admin_command'
+                if user_id in ADMIN_ID and message_text in ADMIN_COMMANDS:
+                    message_type = 'admin_command'
+
     logging.debug(f'Message type: {message_type}')
     user_name = received_message['chat']['first_name']
     if message_type == 'command':
@@ -106,18 +115,23 @@ async def logic(bot):
         elif message_text == '/graph':
             asyncio.ensure_future(bot.send_message(user_id, 'Выберите временной промежуток:',
                                                    reply_markup=kb_choose_time))
+        else:
+            asyncio.ensure_future(bot.send_message(user_id, 'Неверная команда!\nДля вывода подсказки напишите /help'))
 
     elif message_type == 'admin_command':
-        if message_text == '//stat':
+        if message_text == '/admin':
             asyncio.ensure_future(bot.send_message(user_id, f'Наконец то мой дорогой админ {user_name} '
-                                                            f'добрался до статистики! Что интересует?',
+                                                            f'добрался до раздела админских возможностей! '
+                                                            f'Что интересует?',
                                                    reply_markup=kb_admin))
-        elif message_text == '//log':
+        elif message_text == '/log':
             asyncio.ensure_future(bot.send_file(user_id, f'{path}bot.log', reply_markup=kb_start2))
-        elif message_text == '//reboot':
-            await bot.send_message(user_id, 'Перезагружаюсь...')
-            raise restart.UserRestart
-        elif message_text == '//raw':
+        elif message_text == '/restart':
+            asyncio.ensure_future(bot.send_message(user_id, 'Вы уверены?',
+                                                   reply_markup=tg_api.KeyboardBuilder(
+                                                       [['Нет конечно!'], ['Да, перезапуск!'], ['Нет!']])))
+            RESTART_FLAG = 1
+        elif message_text == '/raw':
             keyboard = [[]]
             strings_num = 0
             for i in graph.dates():
@@ -129,8 +143,18 @@ async def logic(bot):
                 )
             asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
                                                    reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
+        elif message_text == '/back':
+            asyncio.ensure_future(bot.send_message(user_id, 'Возвращаю нормальную клавиатуру :)', reply_markup=kb_start2))
     elif message_type == 'text':
-        asyncio.ensure_future(bot.send_message(user_id, 'Данный тип данных не поддерживается'))
+        if user_id in ADMIN_ID and message_text == 'Да, перезапуск!' and RESTART_FLAG:
+            RESTART_FLAG = 0
+            await bot.send_message(user_id, 'Перезапускаюсь...', reply_markup=kb_start2)
+            raise restart.UserRestart
+        elif user_id in ADMIN_ID and RESTART_FLAG:
+            asyncio.ensure_future(bot.send_message(user_id, 'Перезапуск отменен', reply_markup=kb_start2))
+            RESTART_FLAG = 0
+        else:
+            asyncio.ensure_future(bot.send_message(user_id, 'Помочь с командами?\nНапиши /help'))
     elif message_type == 'callback_query':
         if data[0] == '+':
             bt_pm25 = tg_api.InlineButtonBuilder('Частицы PM2.5', callback_data='=PM2.5' + data)
@@ -186,11 +210,14 @@ async def logic(bot):
 
 async def main(best_proxy: str):
     session = aiohttp.ClientSession()
-    tg_bot = BotHandler(tkbot_token, session, best_proxy)
-    t1 = asyncio.ensure_future(repeat(0, logic, tg_bot))
-    t2 = asyncio.ensure_future(repeat(60, graph.get_info, session))
-    await t1
-    await t2
+    try:
+        tg_bot = BotHandler(tkbot_token, session, best_proxy)
+        t1 = asyncio.ensure_future(repeat(0, logic, tg_bot))
+        t2 = asyncio.ensure_future(repeat(60, graph.get_info, session))
+        await t1
+        await t2
+    finally:
+        await session.close()
 
 
 if __name__ == '__main__':
@@ -205,14 +232,16 @@ if __name__ == '__main__':
                         level=logging.DEBUG)
     logging.info('Program started')
 
-    admin_id = ['196846654', '463145322']
+    ADMIN_ID = ['196846654', '463145322']
+    ADMIN_COMMANDS = ['/admin', '/log', '/restart', '/raw', '/back']
+    RESTART_FLAG = 0
 
     tkbot_token = '1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw'
     # tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
 
     kb_start = tg_api.KeyboardBuilder([['/now', '/graph'], ['/help']], one_time_keyboard=False)
     kb_start2 = tg_api.KeyboardBuilder([['/now'], ['/graph']], one_time_keyboard=False)
-    kb_admin = tg_api.KeyboardBuilder([['//log', '//raw'], ['//reboot']])
+    kb_admin = tg_api.KeyboardBuilder([['/log', '/raw'], ['/restart', '/back']])
     bt_month = tg_api.InlineButtonBuilder('Месяц', callback_data='+month')
     bt_day = tg_api.InlineButtonBuilder('День', callback_data='-day')
     bt_3h = tg_api.InlineButtonBuilder('3 часа', callback_data='+180')
@@ -221,15 +250,31 @@ if __name__ == '__main__':
     bt_15min = tg_api.InlineButtonBuilder('15 минут', callback_data='+15')
     kb_choose_time = tg_api.InlineMarkupBuilder([[bt_15min, bt_30min, bt_1h], [bt_3h, bt_day], [bt_month]])
     graph = GRAPH()
+    asyncio.set_event_loop(asyncio.new_event_loop())
     ioloop = asyncio.get_event_loop()
-    #ioloop.set_exception_handler(handle_exception)
+    task_proxy = ioloop.create_task(find_proxy())
     try:
-        proxy = ioloop.run_until_complete(find_proxy())
-        if proxy:
-            proxy = f'http://{proxy}'
-        future = ioloop.create_future()
-        ioloop.create_task(main(proxy))
-        ioloop.run_forever()
-    finally:
+        proxy = ioloop.run_until_complete(task_proxy)
+    except Exception as err:
+        logging.critical(f'Restart caused: {type(err)}:{err}')
+        task_proxy.cancel()
+        ioloop.stop()
         ioloop.close()
-        restart.program(1)
+        restart.program(3)
+    else:
+        if proxy:
+            proxy_str = f'http://{proxy}'
+        else:
+            proxy_str = None
+        task_main = ioloop.create_task(main(proxy_str))
+        try:
+            ioloop.run_until_complete(task_main)
+        except Exception as err:
+            logging.critical(f'Restart caused: {type(err)}:{err}')
+        finally:
+            task_main.cancel()
+            ioloop.stop()
+            ioloop.close()
+            restart.program(1)
+else:
+    logging.critical(f'__Name__ is NOT equal main! It is {__name__}')

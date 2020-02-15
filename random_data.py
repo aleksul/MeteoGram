@@ -1,11 +1,17 @@
 import random
 import csv
-import datetime
+from datetime import datetime, timedelta
+from os import name, path
 
-#file_path = 'P:/EOS bot/data' + '/' + '14-02-2020' + '.csv'
-file_path = 'Z:/eos-tour-bot/data' + '/' + '13-02-2020' + '.csv'
 
-def new_file():
+def new_file(date=None):
+    if name == 'nt':
+        prog_path = path.dirname(__file__) + '\\'
+    else:
+        prog_path = '/home/pi/bot/'
+    if date is None:
+        date = datetime.now().strftime('%d-%m-%Y')
+    file_path = prog_path + 'data/' + date + '.csv'
     with open(file_path, "w", newline='') as csv_file:
         writer = csv.writer(csv_file, delimiter=',')
         writer.writerow(['PM2.5', 'PM10', 'Temp', 'Pres', 'Humidity', 'Time'])
@@ -13,12 +19,12 @@ def new_file():
 
 
 def data_writer(i):
-    time = datetime.datetime(2020, 1, 1, 0, 0, 0)
-    delta = datetime.timedelta(minutes=1)
+    time = datetime(2020, 1, 1, 0, 0, 0)
+    delta = timedelta(minutes=1)
     for i in range(i):
         time += delta
-        data_to_write = [random.randint(0, 15)/10, random.randint(0, 15)/10, random.randint(-200, 300)/10,
-                         random.randint(7350, 7750)/10, random.randint(0, 100)/10, time.strftime('%H:%M:%S')]
+        data_to_write = [random.randint(0, 15) / 10, random.randint(0, 15) / 10, random.randint(-200, 300) / 10,
+                         random.randint(7350, 7750) / 10, random.randint(0, 100) / 10, time.strftime('%H:%M:%S')]
         with open(file_path, 'a', newline='') as csv_file:
             writer = csv.writer(csv_file, delimiter=',')
             writer.writerow(data_to_write)

@@ -4,7 +4,7 @@ Note: this function does not return.
 Any cleanup action (like saving data) must be done before calling this function.
 """
 import logging
-from os import execl, name, path
+from os import execl, name, path, spawnv, P_NOWAIT
 import sys
 from time import sleep
 
@@ -42,7 +42,9 @@ def program(secs_of_sleep):
     sleep(secs_of_sleep)
     if name == 'nt':
         logging.info('Restart on Windows')
-        exec(open(prog_path+'bot_main.py').read())
+        #exec(open(prog_path+'bot_main.py').read())
+        spawnv(P_NOWAIT, sys.executable, [sys.executable, prog_path+'bot_main.py', *sys.argv])
+        exit()
     else:
         logging.info(f'Restart on {name}')
         python = sys.executable

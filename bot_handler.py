@@ -82,10 +82,6 @@ class BotHandler:
             return None
 
     async def send_photo(self, chat_id, read, reply_markup=None, bad_asserts=0):
-        '''
-        with open(photo_path, 'rb') as f:  # use this to open photo file
-            read = f.read()
-        '''
         params = dict(chat_id=chat_id)
         if reply_markup:
             params.update(reply_markup=reply_markup)
