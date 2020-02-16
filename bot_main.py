@@ -112,7 +112,8 @@ async def logic(bot):
                                                             f'Давление: {pressure} мм/рт.ст.\n'
                                                             f'Влажность: {humidity} %\n'
                                                             f'Частицы PM2.5: {pm25} мкгр/м³\n'
-                                                            f'Частицы PM10: {pm10} мкгр/м³', ))
+                                                            f'Частицы PM10: {pm10} мкгр/м³',
+                                                   reply_markup=kb_start2))
         elif message_text == '/graph':
             asyncio.ensure_future(bot.send_message(user_id, 'Выберите временной промежуток:',
                                                    reply_markup=kb_choose_time))

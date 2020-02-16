@@ -32,7 +32,6 @@ class GRAPH:
                 await asyncio.sleep(5)
                 raise MeteoError
             else:
-                logging.warning('Another one bad request meteo')
                 bad_requests += 1
                 return await self.get_info(session, bad_requests=bad_requests)
         else:
@@ -220,7 +219,7 @@ class GRAPH:
         data_temp = data['data']
         data_to_graph = []
         minutes_to_graph = []
-        for i in range(3, len(data_temp), 3):
+        for i in range(2, len(data_temp), 3):
             avg = round((data_temp[i-2]+data_temp[i-1]+data_temp[i])/3, 2)
             data_to_graph.append(avg)
             minutes_to_graph.append(minutes_temp[i-1])
@@ -283,6 +282,7 @@ class GRAPH:
         plt.legend([min_bar, max_bar], ['Минимум', 'Максимум'],
                    bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
                    ncol=2, mode="expand", borderaxespad=0.)
+        plt.xlabel('Время суток')
         plt.title('Данные метеостанции в Точке Кипения г.Троицк', pad=27)
         buf = BytesIO()
         plt.savefig(buf, format='png')
