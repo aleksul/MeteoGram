@@ -11,31 +11,6 @@ from graph import GRAPH
 from datetime import datetime
 
 
-async def repeat(interval, func, *args, **kwargs):
-    """Run func every interval seconds.
-
-    If func has not finished before *interval*, will run again
-    immediately when the previous iteration finished.
-
-    *args and **kwargs are passed as the arguments to func.
-    """
-    if interval == 0:
-        while True:
-            try:
-                await func(*args, **kwargs)
-            except Exception as err1:
-                raise err1
-    else:
-        while True:
-            try:
-                await asyncio.gather(
-                    func(*args, **kwargs),
-                    asyncio.sleep(interval),
-                )
-            except Exception as err2:
-                raise err2
-
-
 async def find_proxy():
     inet = Proxy(timeout=3,
                  filename=f'{path}proxy.txt',
@@ -65,6 +40,7 @@ async def find_proxy():
 
 
 async def logic(bot):
+    asyncio.ensure_future(logic(bot), loop=ioloop)
     update = await bot.get_updates()
     if update is None:
         return None
@@ -166,7 +142,8 @@ async def logic(bot):
             asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
                                                    reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
         elif message_text == '/back':
-            asyncio.ensure_future(bot.send_message(user_id, 'Возвращаю нормальную клавиатуру :)', reply_markup=kb_start2))
+            asyncio.ensure_future(
+                bot.send_message(user_id, 'Возвращаю нормальную клавиатуру :)', reply_markup=kb_start2))
     elif message_type == 'text':
         if user_id in ADMIN_ID and message_text == 'Да, перезапуск!' and RESTART_FLAG:
             RESTART_FLAG = 0
@@ -202,7 +179,7 @@ async def logic(bot):
                                                        reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
             elif data.split('+')[0] == '-raw':
                 asyncio.ensure_future(bot.send_file(user_id,
-                                                    path+'/'+'data'+'/'+data.split('+')[1]+'.csv',
+                                                    path + '/' + 'data' + '/' + data.split('+')[1] + '.csv',
                                                     reply_markup=kb_start2))
 
         elif data[0] == '=':
@@ -236,16 +213,8 @@ async def logic(bot):
         asyncio.ensure_future(bot.send_message(user_id, 'Данный тип данных не поддерживается'))
 
 
-async def main(best_proxy: str):
-    session = aiohttp.ClientSession()
-    try:
-        tg_bot = BotHandler(tkbot_token, session, best_proxy)
-        t1 = asyncio.ensure_future(repeat(0, logic, tg_bot))
-        t2 = asyncio.ensure_future(repeat(60, graph.get_info, session))
-        await t1
-        await t2
-    finally:
-        await session.close()
+async def aio_session(loop):
+    return aiohttp.ClientSession()
 
 
 if __name__ == '__main__':
@@ -294,13 +263,18 @@ if __name__ == '__main__':
             proxy_str = f'http://{proxy}'
         else:
             proxy_str = None
-        task_main = ioloop.create_task(main(proxy_str))
+        session = ioloop.run_until_complete(aio_session(ioloop))
+        tg_bot = BotHandler(tkbot_token, session, proxy)
+        get_info_task = ioloop.create_task(graph.get_info(session, ioloop))
+        tg_task = ioloop.create_task(logic(tg_bot))
         try:
-            ioloop.run_until_complete(task_main)
+            ioloop.run_forever()
         except Exception as err:
             logging.critical(f'Restart caused: {type(err)}:{err}')
         finally:
-            task_main.cancel()
+            get_info_task.cancel()
+            tg_task.cancel()
+            session.close()
             ioloop.stop()
             ioloop.close()
             restart.program(1)
