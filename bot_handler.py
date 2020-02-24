@@ -1,6 +1,9 @@
 import asyncio
 import aiohttp
 import logging
+
+from aiohttp import FormData
+
 from restart import SendError, GetUpdatesError
 
 
@@ -65,7 +68,7 @@ class BotHandler:
         except AssertionError:
             logging.warning('Assertion error!')
             if bad_asserts >= 3:
-                logging.critical('Too many bad asserts!')
+                logging.critical('Too many bad asserts (send message)!')
                 raise SendError
             else:
                 bad_asserts += 1
@@ -85,16 +88,19 @@ class BotHandler:
         params = dict(chat_id=chat_id)
         if reply_markup:
             params.update(reply_markup=reply_markup)
-        params.update(photo=read)
+        data = FormData()
+        data.add_field('photo',
+                       read)
         try:
             async with self.session.post(
                     f'https://api.telegram.org/bot{self.token}/sendPhoto',
-                    data=params, proxy=self.proxy) as resp:
+                    params=params, data=data,
+                    proxy=self.proxy) as resp:
                 assert resp.status == 200
         except AssertionError:
             logging.warning('Assertion error!')
             if bad_asserts >= 3:
-                logging.critical('Too many bad asserts!')
+                logging.critical('Too many bad asserts (send photo)!')
                 raise SendError
             else:
                 bad_asserts += 1
@@ -106,29 +112,34 @@ class BotHandler:
         else:
             return None
 
-    async def send_file(self, chat_id, file_path, reply_markup=None, bad_asserts=0):
+    async def send_file(self, chat_id, file_path, filename, reply_markup=None, bad_asserts=0):
         with open(file_path, 'rb') as f:
             read = f.read()
         params = dict(chat_id=chat_id)
         if reply_markup:
             params.update(reply_markup=reply_markup)
-        params.update(document=read)
+        data = FormData()
+        data.add_field('document',
+                       read,
+                       filename=filename)
         try:
             async with self.session.post(
                     f'https://api.telegram.org/bot{self.token}/sendDocument',
-                    data=params, proxy=self.proxy) as resp:
+                    params=params, data=data,
+                    proxy=self.proxy) as resp:
                 assert resp.status == 200
         except AssertionError:
             logging.warning('Assertion error!')
             if bad_asserts >= 3:
-                logging.critical('Too many bad asserts!')
+                logging.critical('Too many bad asserts (send file)!')
                 raise SendError
             else:
                 bad_asserts += 1
                 await asyncio.sleep(1)
-                return await self.send_file(chat_id, file_path, reply_markup=reply_markup, bad_asserts=bad_asserts)
+                return await self.send_file(chat_id, file_path, filename,
+                                            reply_markup=reply_markup, bad_asserts=bad_asserts)
         except Exception as err:
-            logging.critical(f"Send photo error: {type(err)}:{err}")
+            logging.critical(f"Send file error: {type(err)}:{err}")
             raise SendError
         else:
             return None
