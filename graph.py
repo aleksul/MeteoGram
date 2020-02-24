@@ -1,5 +1,4 @@
 import asyncio
-import aiohttp
 import matplotlib.pyplot as plt
 from bs4 import BeautifulSoup
 import csv
@@ -8,6 +7,7 @@ from datetime import datetime, timedelta, time
 from os import path, stat, name, remove, listdir
 from io import BytesIO
 from restart import MeteoError
+
 
 class GRAPH:
     def __init__(self, ip='192.168.0.175', prog_path=None):
@@ -26,6 +26,7 @@ class GRAPH:
             async with session.get(self.ip_add) as resp:
                 assert resp.status == 200
                 text = await resp.text()
+                data = self.html_parser(text)
         except Exception as err:
             logging.error(f"Getting info from meteo error: {type(err)}:{err}")
             if bad_requests >= 5:
@@ -36,10 +37,10 @@ class GRAPH:
                 bad_requests += 1
                 return await self.get_info(session, loop, bad_requests=bad_requests)
         else:
-            data = self.html_parser(text)
             return self.csv_write(data)
 
-    def html_parser(self, text):
+    @staticmethod
+    def html_parser(text):
         soup = BeautifulSoup(text, 'html.parser')
         soup = soup.find_all('td', class_='r')
         data_to_write = []
@@ -60,7 +61,7 @@ class GRAPH:
         logging.debug('Wrote info to the file')
         return None
 
-    def csv_path(self, date=None, new_file=True, bad_tries=0):
+    def csv_path(self, date=None, new_file=True, bad_tries=0):  # creates new file or show previous
         if date is None:
             date = datetime.now().strftime('%d-%m-%Y')
         file_path = self.prog_path + 'data/' + date + '.csv'
@@ -73,7 +74,7 @@ class GRAPH:
                 self.delete_old()  # call deleter every time we write new file
             else:
                 if bad_tries >= 5:
-                    logging.warning('Did NOT file the file, so we will create new')
+                    logging.warning('Can NOT find the file, so will create a new one')
                     return self.csv_path()
                 else:
                     bad_tries += 1
@@ -81,7 +82,17 @@ class GRAPH:
                     return self.csv_path(self.previous_date(date), new_file=False, bad_tries=bad_tries)
         return file_path
 
+    def read_last(self):  # reads last data
+        date = datetime.now().strftime('%d-%m-%Y')
+        file_path = self.csv_path(date=date, new_file=False)  # the name of file we will read
+        logging.debug(f'Reading file: {file_path}')
+        with open(file_path, 'r') as f:
+            reader = csv.DictReader(f)  # read the file as csv table
+            read_list = list(reader)
+        return read_list[-1]
+
     def read_csv(self, parameter: str, minutes: int, date=None, previous_data=None, previous_time=None):
+        # returns last _minutes_ values
         data_to_graph = []
         time_to_graph = []
         if date is None:
@@ -117,7 +128,7 @@ class GRAPH:
         else:
             return {'data': data_to_graph, 'time': time_to_graph}
 
-    def read_all_csv(self, parameter: str, date: str):
+    def read_all_csv(self, parameter: str, date: str):  # returns all data for one day
         data_to_graph = []
         time_to_graph = []
         file_path = self.csv_path(date=date, new_file=False)
@@ -134,20 +145,8 @@ class GRAPH:
             )
         return {'data': data_to_graph, 'time': time_to_graph}
 
-    def read_month(self, parameter: str):
-        if name == 'nt':
-            files = listdir(self.prog_path+'\\data')
-        else:
-            files = listdir(self.prog_path+'/data')
-        files = [i[0:-4] for i in files]  # delete .csv from file name
-        temp_list = []
-        for i in files:
-            temp = i.split('-')
-            temp = datetime(int(temp[2]), int(temp[1]), int(temp[0]))  # make all dates datetime objects to sort them
-            temp_list.append(temp)
-        files = temp_list
-        files.sort()
-        files = [i.strftime('%d-%m-%Y') for i in files]  # and make them strings again
+    def read_month(self, parameter: str):  # returns min and max for every saved day (file)
+        files = self.dates()
         max_list = []
         min_list = []
         for i in files:
@@ -156,24 +155,8 @@ class GRAPH:
             min_list.append(min(read_day['data']))
         return {'min': min_list, 'max': max_list, 'dates': files}
 
-    def previous_date(self, date: str):  # receives date as 01-01-2020 and returns previous date as 31-12-2019
-        date = date.split('-')
-        date = datetime(int(date[2]), int(date[1]), int(date[0]))
-        date -= timedelta(days=1)
-        return date.strftime('%d-%m-%Y')
-
-    def delete_old(self, days_to_save=30, files_num=1):
-        old_file_date = datetime.now() - timedelta(days=days_to_save)
-        one_day_delta = timedelta(days=1)
-        for i in range(files_num):
-            file_path = self.prog_path + 'data/' + old_file_date.strftime('%d-%m-%Y') + '.csv'
-            logging.debug(f'File that should be removed:{file_path}')
-            if path.exists(file_path):
-                remove(file_path)
-                logging.info(f'Removed old file: {file_path}')
-            old_file_date -= one_day_delta
-
-    def plot_minutes(self, data, parameter):  # do NOT pass over 100 points
+    @staticmethod
+    def plot_minutes(data, parameter):  # plots a graph for x last minutes (x should be <100)
         if data is None:
             logging.error("Can't plot the graph, no data!")
             return None
@@ -182,13 +165,14 @@ class GRAPH:
         plt.plot(minutes, data, marker='.')
         plt.gcf().autofmt_xdate()
         ax = plt.gca()  # gca stands for 'get current axis'
-        labels_count = len(ax.xaxis.get_ticklabels())
+        all_labels = ax.xaxis.get_ticklabels()
+        labels_count = len(all_labels)
         if labels_count > 15:
-            for label in ax.xaxis.get_ticklabels()[::2]:
-                label.set_visible(False)
+            for i in range(1, labels_count, 2):
+                all_labels[i].set_visible(False)
         if labels_count > 30:
-            for label in ax.xaxis.get_ticklabels()[1::2]:
-                label.set_visible(False)
+            for i in range(2, labels_count, 4):
+                all_labels[i].set_visible(False)
         plt.xlabel('Время')
         if parameter == 'PM2.5':
             plt.ylabel('Частицы PM2.5, мкгр/м³')
@@ -212,7 +196,7 @@ class GRAPH:
         plt.close()
         return buffer
 
-    def plot_three_hours(self, data, parameter):  # counts average of three nearest points
+    def plot_three_hours(self, data, parameter):  # counts average of three nearest points and uses plot_minutes then
         if data is None:
             logging.error("Can't plot the graph, no data!")
             return None
@@ -227,17 +211,8 @@ class GRAPH:
         data_return = dict(data=data_to_graph, time=minutes_to_graph)
         return self.plot_minutes(data_return, parameter)
 
-    def dates(self):
-        if name == 'nt':
-            files = listdir(self.prog_path+'\\data')
-        else:
-            files = listdir(self.prog_path+'/data')
-
-        # delete .csv from file name + delete today file
-        files = [i[0:-4] for i in files if i != datetime.now().strftime('%d-%m-%Y')+'.csv']
-        return files
-
-    def plot_day(self, data: dict, parameter: str):
+    @staticmethod
+    def plot_day(data: dict, parameter: str):  # plots graph of a day with min and max for four time periods
         if data is None:
             logging.error("Can't plot the graph, no data!")
             return None
@@ -293,7 +268,8 @@ class GRAPH:
         plt.close()
         return buffer
 
-    def plot_month(self, data: dict, parameter: str):
+    @staticmethod
+    def plot_month(data: dict, parameter: str):  # plots month graph with min and max values of a day
         if data is None:
             logging.error("Can't plot the graph, no data!")
             return None
@@ -304,10 +280,11 @@ class GRAPH:
         max_line, = plt.plot(dates, max_list, marker='.', color='orange', label='Максимум')
         plt.gcf().autofmt_xdate()
         ax = plt.gca()  # gca stands for 'get current axis'
-        labels_count = len(ax.xaxis.get_ticklabels())
+        all_labels = ax.xaxis.get_ticklabels()
+        labels_count = len(all_labels)
         if labels_count > 15:
-            for label in ax.xaxis.get_ticklabels()[::2]:
-                label.set_visible(False)
+            for i in range(1, labels_count, 2):
+                all_labels[i].set_visible(False)
         plt.xlabel('Дни')
         if parameter == 'PM2.5':
             plt.ylabel('Частицы PM2.5, мкгр/м³')
@@ -333,3 +310,39 @@ class GRAPH:
         buf.close()
         plt.close()
         return buffer
+
+    def dates(self):  # returns all the files in dates order
+        if name == 'nt':
+            files = listdir(self.prog_path+'\\data')
+        else:
+            files = listdir(self.prog_path+'/data')
+
+        # delete .csv from file name + delete today file
+        files = [i[0:-4] for i in files if i != datetime.now().strftime('%d-%m-%Y')+'.csv']
+        temp_list = []
+        for i in files:
+            temp = i.split('-')
+            temp = datetime(int(temp[2]), int(temp[1]), int(temp[0]))  # make all dates datetime objects to sort them
+            temp_list.append(temp)
+        files = temp_list
+        files.sort()
+        files = [i.strftime('%d-%m-%Y') for i in files]  # and make them strings again
+        return files
+
+    @staticmethod
+    def previous_date(date: str):  # receives date as 01-01-2020 and returns previous date as 31-12-2019
+        date = date.split('-')
+        date = datetime(int(date[2]), int(date[1]), int(date[0]))
+        date -= timedelta(days=1)
+        return date.strftime('%d-%m-%Y')
+
+    def delete_old(self, days_to_save=30, files_num=1):  # deletes old files (calls every time new file creates)
+        old_file_date = datetime.now() - timedelta(days=days_to_save)
+        one_day_delta = timedelta(days=1)
+        for i in range(files_num):
+            file_path = self.prog_path + 'data/' + old_file_date.strftime('%d-%m-%Y') + '.csv'
+            logging.debug(f'File that should be removed:{file_path}')
+            if path.exists(file_path):
+                remove(file_path)
+                logging.info(f'Removed old file: {file_path}')
+            old_file_date -= one_day_delta

@@ -12,7 +12,6 @@ class Proxy:
         self.site_to_test = site_to_test
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self.filename = filename
-        self.proxies_num = 10
 
     async def internet_check(self, site: str):
         try:
@@ -27,8 +26,8 @@ class Proxy:
             return {'site': site, 'result': True}
 
     async def broker_find(self):
+        proxies_num = 10
         try:
-            proxies_num = self.proxies_num
             proxies = asyncio.Queue()
             broker = Broker(queue=proxies)
             await broker.find(types=['HTTPS'], limit=proxies_num)  # finds 10(==proxies_num) https proxies

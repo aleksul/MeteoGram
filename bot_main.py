@@ -73,23 +73,32 @@ async def logic(bot):
         elif message_text == '/help':
             asyncio.ensure_future(bot.send_message(user_id, 'Все чрезвычайно просто:\n'
                                                             '• для просмотра текущего состояния напиши /now\n'
-                                                            '• для построения графика напиши /graph\n\n'
+                                                            '• для построения графика напиши /graph\n'
+                                                            '• для просмотра сырого файла напиши /raw\n\n'
                                                             'Интересуют подробности отображаемых измерений?\n'
                                                             'Напиши /info',
                                                    reply_markup=kb_start2))
         elif message_text == '/now':
-            date = datetime.now().strftime('%d-%m-%Y')
-            temperature = graph.read_csv('Temp', 1, date=date)['data'][0]
-            pm25 = graph.read_csv('PM2.5', 1, date=date)['data'][0]
-            pm10 = graph.read_csv('PM10', 1, date=date)['data'][0]
-            pressure = graph.read_csv('Pres', 1, date=date)['data'][0]
-            humidity = graph.read_csv('Humidity', 1, date=date)['data'][0]
-            asyncio.ensure_future(bot.send_message(user_id, f'Температура: {temperature} °C\n'
-                                                            f'Давление: {pressure} мм/рт.ст.\n'
-                                                            f'Влажность: {humidity} %\n'
-                                                            f'Частицы PM2.5: {pm25} мкгр/м³\n'
-                                                            f'Частицы PM10: {pm10} мкгр/м³',
+            now = graph.read_last()
+            asyncio.ensure_future(bot.send_message(user_id, f'Данные собраны в {now["Time"]}\n\n'
+                                                            f'Температура: {now["Temp"]} °C\n'
+                                                            f'Давление: {now["Pres"]} мм/рт.ст.\n'
+                                                            f'Влажность: {now["Humidity"]} %\n'
+                                                            f'Частицы PM2.5: {now["PM2.5"]} мкгр/м³\n'
+                                                            f'Частицы PM10: {now["PM10"]} мкгр/м³',
                                                    reply_markup=kb_start2))
+        elif message_text == '/raw':
+            keyboard = [[]]
+            strings_num = 0
+            for i in graph.dates():
+                if len(keyboard[strings_num]) > 2:
+                    keyboard.append([])
+                    strings_num += 1
+                keyboard[strings_num].append(
+                    tg_api.InlineButtonBuilder(i, callback_data='-raw+' + i)
+                )
+            asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
+                                                   reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
         elif message_text == '/graph':
             asyncio.ensure_future(bot.send_message(user_id, 'Выберите временной промежуток:',
                                                    reply_markup=kb_choose_time))
@@ -123,27 +132,20 @@ async def logic(bot):
                                                             f'Что интересует?',
                                                    reply_markup=kb_admin))
         elif message_text == '/log':
-            asyncio.ensure_future(bot.send_file(user_id, f'{path}bot.log', reply_markup=kb_start2))
+            asyncio.ensure_future(bot.send_file(user_id, f'{path}bot.log', 'log.txt', reply_markup=kb_start2))
         elif message_text == '/restart':
             asyncio.ensure_future(bot.send_message(user_id, 'Вы уверены?',
                                                    reply_markup=tg_api.KeyboardBuilder(
                                                        [['Нет конечно!'], ['Да, перезапуск!'], ['Нет!']])))
             RESTART_FLAG = 1
-        elif message_text == '/raw':
-            keyboard = [[]]
-            strings_num = 0
-            for i in graph.dates():
-                if len(keyboard[strings_num]) > 2:
-                    keyboard.append([])
-                    strings_num += 1
-                keyboard[strings_num].append(
-                    tg_api.InlineButtonBuilder(i, callback_data='-raw+' + i)
-                )
-            asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
-                                                   reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
         elif message_text == '/back':
+<<<<<<< HEAD
             asyncio.ensure_future(
                 bot.send_message(user_id, 'Возвращаю нормальную клавиатуру :)', reply_markup=kb_start2))
+=======
+            asyncio.ensure_future(bot.send_message(user_id, 'Возвращаю нормальную клавиатуру :)',
+                                                   reply_markup=kb_start2))
+>>>>>>> develop_new
     elif message_type == 'text':
         if user_id in ADMIN_ID and message_text == 'Да, перезапуск!' and RESTART_FLAG:
             RESTART_FLAG = 0
@@ -230,15 +232,15 @@ if __name__ == '__main__':
     logging.info('Program started')
 
     ADMIN_ID = ['196846654', '463145322']
-    ADMIN_COMMANDS = ['/admin', '/log', '/restart', '/raw', '/back']
+    ADMIN_COMMANDS = ['/admin', '/log', '/restart', '/back']
     RESTART_FLAG = 0
 
     tkbot_token = '1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw'
     # tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
 
-    kb_start = tg_api.KeyboardBuilder([['/now', '/graph'], ['/help']], one_time_keyboard=False)
-    kb_start2 = tg_api.KeyboardBuilder([['/now'], ['/graph']], one_time_keyboard=False)
-    kb_admin = tg_api.KeyboardBuilder([['/log', '/raw'], ['/restart', '/back']])
+    kb_start = tg_api.KeyboardBuilder([['/now', '/graph', '/raw'], ['/help']], one_time_keyboard=False)
+    kb_start2 = tg_api.KeyboardBuilder([['/now'], ['/graph'], ['/raw']], one_time_keyboard=False)
+    kb_admin = tg_api.KeyboardBuilder([['/log', '/restart'], ['/back']])
     bt_month = tg_api.InlineButtonBuilder('Месяц', callback_data='+month')
     bt_day = tg_api.InlineButtonBuilder('День', callback_data='-day')
     bt_3h = tg_api.InlineButtonBuilder('3 часа', callback_data='+180')
