@@ -8,7 +8,6 @@ import logging
 import restart
 from os import name, path
 from graph import GRAPH
-from datetime import datetime
 
 
 async def find_proxy():
@@ -139,13 +138,8 @@ async def logic(bot):
                                                        [['Нет конечно!'], ['Да, перезапуск!'], ['Нет!']])))
             RESTART_FLAG = 1
         elif message_text == '/back':
-<<<<<<< HEAD
             asyncio.ensure_future(
                 bot.send_message(user_id, 'Возвращаю нормальную клавиатуру :)', reply_markup=kb_start2))
-=======
-            asyncio.ensure_future(bot.send_message(user_id, 'Возвращаю нормальную клавиатуру :)',
-                                                   reply_markup=kb_start2))
->>>>>>> develop_new
     elif message_type == 'text':
         if user_id in ADMIN_ID and message_text == 'Да, перезапуск!' and RESTART_FLAG:
             RESTART_FLAG = 0
