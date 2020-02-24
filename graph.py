@@ -20,7 +20,8 @@ class GRAPH:
         else:
             self.prog_path = prog_path
 
-    async def get_info(self, session, bad_requests=0):
+    async def get_info(self, session, loop, bad_requests=0):
+        loop.call_later(60, self.get_info(session, loop))
         try:
             async with session.get(self.ip_add) as resp:
                 assert resp.status == 200
@@ -34,7 +35,7 @@ class GRAPH:
                 raise MeteoError
             else:
                 bad_requests += 1
-                return await self.get_info(session, bad_requests=bad_requests)
+                return await self.get_info(session, loop, bad_requests=bad_requests)
         else:
             return self.csv_write(data)
 
