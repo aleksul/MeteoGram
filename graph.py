@@ -182,6 +182,7 @@ class GRAPH:
             plt.ylabel('Температура, °C')
         elif parameter == 'Pres':
             plt.ylabel('Давление, мм/рт.ст.')
+            plt.ylim(bottom=700)
         elif parameter == 'Humidity':
             plt.ylabel('Влажность, %')
         else:
@@ -250,6 +251,7 @@ class GRAPH:
             plt.ylabel('Температура, °C')
         elif parameter == 'Pres':
             plt.ylabel('Давление, мм/рт.ст.')
+            plt.ylim(bottom=700)
         elif parameter == 'Humidity':
             plt.ylabel('Влажность, %')
         else:
@@ -294,6 +296,7 @@ class GRAPH:
             plt.ylabel('Температура, °C')
         elif parameter == 'Pres':
             plt.ylabel('Давление, мм/рт.ст.')
+            plt.ylim(bottom=700)
         elif parameter == 'Humidity':
             plt.ylabel('Влажность, %')
         else:
