@@ -39,7 +39,6 @@ async def find_proxy():
 
 
 async def logic(bot):
-    asyncio.ensure_future(logic(bot), loop=ioloop)
     update = await bot.get_updates()
     if update is None:
         return None
@@ -209,8 +208,18 @@ async def logic(bot):
         asyncio.ensure_future(bot.send_message(user_id, 'Данный тип данных не поддерживается'))
 
 
-async def aio_session(loop):
-    return aiohttp.ClientSession()
+async def aio_session(proxy_local):
+    async with aiohttp.ClientSession() as session:
+        tg_bot = BotHandler(tkbot_token, session, proxy_local)
+        minute = ioloop.time()
+        task_get_info = asyncio.ensure_future(graph.get_info(session), loop=ioloop)
+        while 1:
+            task_bot = asyncio.ensure_future(logic(tg_bot), loop=ioloop)
+            if ioloop.time()-minute >= 60.0:
+                minute = ioloop.time()
+                task_get_info = asyncio.ensure_future(graph.get_info(session), loop=ioloop)
+            await task_bot
+            await task_get_info
 
 
 if __name__ == '__main__':
@@ -222,7 +231,7 @@ if __name__ == '__main__':
     logging.basicConfig(filename=f'{path}bot.log',
                         format='%(asctime)s    %(levelname)s: %(message)s',
                         datefmt='%d/%m/%Y %H:%M:%S',
-                        level=logging.INFO)
+                        level=logging.DEBUG)
     logging.info('Program started')
 
     ADMIN_ID = ['196846654', '463145322']
@@ -259,18 +268,11 @@ if __name__ == '__main__':
             proxy_str = f'http://{proxy}'
         else:
             proxy_str = None
-        session = ioloop.run_until_complete(aio_session(ioloop))
-        tg_bot = BotHandler(tkbot_token, session, proxy)
-        get_info_task = ioloop.create_task(graph.get_info(session, ioloop))
-        tg_task = ioloop.create_task(logic(tg_bot))
         try:
-            ioloop.run_forever()
+            ioloop.run_until_complete(aio_session(proxy_str))
         except Exception as err:
             logging.critical(f'Restart caused: {type(err)}:{err}')
         finally:
-            get_info_task.cancel()
-            tg_task.cancel()
-            session.close()
             ioloop.stop()
             ioloop.close()
             restart.program(1)

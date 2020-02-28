@@ -1,4 +1,5 @@
 import asyncio
+from aiohttp import ClientTimeout
 import matplotlib.pyplot as plt
 from bs4 import BeautifulSoup
 import csv
@@ -10,7 +11,7 @@ from restart import MeteoError
 
 
 class GRAPH:
-    def __init__(self, ip='192.168.0.175', prog_path=None):
+    def __init__(self, ip='192.168.0.175', prog_path=None, timeout=15):
         self.ip_add = 'http://' + ip + '/values'
         if prog_path is None:
             if name == 'nt':
@@ -19,11 +20,11 @@ class GRAPH:
                 self.prog_path = '/home/pi/bot/'
         else:
             self.prog_path = prog_path
+        self.timeout = ClientTimeout(total=timeout)
 
-    async def get_info(self, session, loop, bad_requests=0):
-        loop.call_later(60, self.get_info(session, loop))
+    async def get_info(self, session, bad_requests=0):
         try:
-            async with session.get(self.ip_add) as resp:
+            async with session.get(self.ip_add, timeout=self.timeout) as resp:
                 assert resp.status == 200
                 text = await resp.text()
                 data = self.html_parser(text)
@@ -35,7 +36,7 @@ class GRAPH:
                 raise MeteoError
             else:
                 bad_requests += 1
-                return await self.get_info(session, loop, bad_requests=bad_requests)
+                return await self.get_info(session, bad_requests=bad_requests)
         else:
             return self.csv_write(data)
 

@@ -24,7 +24,7 @@ class BotHandler:
         try:
             async with self.session.get(
                     f'https://api.telegram.org/bot{self.token}/getUpdates',
-                    params=params, proxy=self.proxy) as resp:
+                    params=params, proxy=self.proxy, timeout=self.timeout) as resp:
                 assert resp.status == 200
                 result = await resp.json()
                 result = result['result']
