@@ -1,6 +1,7 @@
 import asyncio
 from aiohttp import ClientTimeout
 import matplotlib.pyplot as plt
+from matplotlib.dates import DateFormatter
 from bs4 import BeautifulSoup
 import csv
 import logging
@@ -162,10 +163,17 @@ class GRAPH:
             logging.error("Can't plot the graph, no data!")
             return None
         minutes = data['time']
+        time_local = []
+        for i in minutes:
+            time_local.append(
+                datetime.strptime(i, '%H:%M:%S')
+            )
         data = data['data']
-        plt.plot(minutes, data, marker='.')
+        data_formatter = DateFormatter('%H:%M')
+        plt.plot(time_local, data, marker='.')
         plt.gcf().autofmt_xdate()
         ax = plt.gca()  # gca stands for 'get current axis'
+        ax.xaxis.set_major_formatter(data_formatter)
         all_labels = ax.xaxis.get_ticklabels()
         labels_count = len(all_labels)
         if labels_count > 15:

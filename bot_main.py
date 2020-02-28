@@ -242,7 +242,7 @@ if __name__ == '__main__':
     # tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
 
     kb_start = tg_api.KeyboardBuilder([['/now', '/graph', '/raw'], ['/help']], one_time_keyboard=False)
-    kb_start2 = tg_api.KeyboardBuilder([['/now'], ['/graph'], ['/raw']], one_time_keyboard=False)
+    kb_start2 = tg_api.KeyboardBuilder([['/now'], ['/graph', '/raw']], one_time_keyboard=False)
     kb_admin = tg_api.KeyboardBuilder([['/log', '/restart'], ['/back']])
     bt_month = tg_api.InlineButtonBuilder('Месяц', callback_data='+month')
     bt_day = tg_api.InlineButtonBuilder('День', callback_data='-day')
