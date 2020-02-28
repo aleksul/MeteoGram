@@ -216,7 +216,7 @@ async def aio_session(proxy_local):
         while 1:
             task_bot = asyncio.ensure_future(logic(tg_bot), loop=ioloop)
             if ioloop.time()-minute >= 60.0:
-                minute = ioloop.time()
+                minute += 60.0
                 task_get_info = asyncio.ensure_future(graph.get_info(session), loop=ioloop)
             await task_bot
             await task_get_info
