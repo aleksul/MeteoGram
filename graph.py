@@ -31,9 +31,9 @@ class GRAPH:
                 data = self.html_parser(text)
         except Exception as err:
             logging.error(f"Getting info from meteo error: {type(err)}:{err}")
+            await asyncio.sleep(5)
             if bad_requests >= 5:
                 logging.critical('Too many bad requests with meteo')
-                await asyncio.sleep(5)
                 raise MeteoError
             else:
                 bad_requests += 1

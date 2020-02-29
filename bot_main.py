@@ -212,14 +212,17 @@ async def aio_session(proxy_local):
     async with aiohttp.ClientSession() as session:
         tg_bot = BotHandler(tkbot_token, session, proxy_local)
         minute = ioloop.time()
-        task_get_info = asyncio.ensure_future(graph.get_info(session), loop=ioloop)
+        task_bot = asyncio.ensure_future(logic(tg_bot), loop=ioloop)
+        task_get_info = asyncio.ensure_future(graph.get_info(session, future), loop=ioloop)
         while 1:
-            task_bot = asyncio.ensure_future(logic(tg_bot), loop=ioloop)
-            if ioloop.time()-minute >= 60.0:
+            if bool(task_bot.done()):
+                task_bot.result()
+                task_bot = asyncio.ensure_future(logic(tg_bot), loop=ioloop)
+            if bool(task_get_info.done()):
+                task_get_info.result()
+            if ioloop.time() - minute >= 60.0:
                 minute += 60.0
                 task_get_info = asyncio.ensure_future(graph.get_info(session), loop=ioloop)
-            await task_bot
-            await task_get_info
 
 
 if __name__ == '__main__':
