@@ -175,6 +175,7 @@ async def logic(bot):
             elif data.split('+')[0] == '-raw':
                 asyncio.ensure_future(bot.send_file(user_id,
                                                     path + '/' + 'data' + '/' + data.split('+')[1] + '.csv',
+                                                    filename='data.split('+')[1]'+'.txt',
                                                     reply_markup=kb_start2))
 
         elif data[0] == '=':
@@ -213,7 +214,7 @@ async def aio_session(proxy_local):
         tg_bot = BotHandler(tkbot_token, session, proxy_local)
         minute = ioloop.time()
         task_bot = asyncio.ensure_future(logic(tg_bot), loop=ioloop)
-        task_get_info = asyncio.ensure_future(graph.get_info(session, future), loop=ioloop)
+        task_get_info = asyncio.ensure_future(graph.get_info(session), loop=ioloop)
         while 1:
             if bool(task_bot.done()):
                 task_bot.result()

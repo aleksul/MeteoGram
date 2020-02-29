@@ -12,7 +12,7 @@ class BotHandler:
         self.token = token
         self.session = session
         self.proxy = proxy
-        self.timeout = aiohttp.ClientTimeout(total=timeout)
+        self.timeout = aiohttp.ClientTimeout(total=timeout+3)
         self.tg_timeout = timeout
         self.api_url = f"https://api.telegram.org/bot{token}/"
         self.offset = None
