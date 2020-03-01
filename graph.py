@@ -171,29 +171,24 @@ class GRAPH:
         data = data['data']
         data_formatter = DateFormatter('%H:%M')
         plt.plot(time_local, data, marker='.')
+        plt.xlim(left=time_local[0], right=time_local[-1])  # invert x axis
         plt.gcf().autofmt_xdate()
         ax = plt.gca()  # gca stands for 'get current axis'
         ax.xaxis.set_major_formatter(data_formatter)
-        all_labels = ax.xaxis.get_ticklabels()
-        labels_count = len(all_labels)
-        if labels_count > 15:
-            for i in range(1, labels_count, 2):
-                all_labels[i].set_visible(False)
-        if labels_count > 30:
-            for i in range(2, labels_count, 4):
-                all_labels[i].set_visible(False)
         plt.xlabel('Время')
         if parameter == 'PM2.5':
             plt.ylabel('Частицы PM2.5, мкгр/м³')
         elif parameter == 'PM10':
             plt.ylabel('Частицы PM10, мкгр/м³')
         elif parameter == 'Temp':
+            ax.set_autoscale_on(True)
             plt.ylabel('Температура, °C')
         elif parameter == 'Pres':
             plt.ylabel('Давление, мм/рт.ст.')
-            plt.ylim(bottom=700)
+            ax.set_autoscale_on(True)
         elif parameter == 'Humidity':
             plt.ylabel('Влажность, %')
+            ax.set_autoscale_on(True)
         else:
             logging.error('Parameter is wrong!')
             return None
@@ -258,11 +253,14 @@ class GRAPH:
             plt.ylabel('Частицы PM10, мкгр/м³')
         elif parameter == 'Temp':
             plt.ylabel('Температура, °C')
+            plt.gca().set_autoscale_on(True)
         elif parameter == 'Pres':
             plt.ylabel('Давление, мм/рт.ст.')
-            plt.ylim(bottom=700)
+            plt.ylim(bottom=min(y1)-10, top=max(y2)+10)
+            plt.gca().set_autoscale_on(True)
         elif parameter == 'Humidity':
             plt.ylabel('Влажность, %')
+            plt.gca().set_autoscale_on(True)
         else:
             logging.error('Parameter is wrong!')
             return None
@@ -289,24 +287,23 @@ class GRAPH:
         dates = data['dates']
         min_line, = plt.plot(dates, min_list, marker='.', color='blue', label='Минимум')
         max_line, = plt.plot(dates, max_list, marker='.', color='orange', label='Максимум')
+        plt.xlim(left=dates[-1], right=dates[0])  # invert x axis
         plt.gcf().autofmt_xdate()
         ax = plt.gca()  # gca stands for 'get current axis'
         all_labels = ax.xaxis.get_ticklabels()
-        labels_count = len(all_labels)
-        if labels_count > 15:
-            for i in range(1, labels_count, 2):
-                all_labels[i].set_visible(False)
         plt.xlabel('Дни')
         if parameter == 'PM2.5':
             plt.ylabel('Частицы PM2.5, мкгр/м³')
         elif parameter == 'PM10':
             plt.ylabel('Частицы PM10, мкгр/м³')
         elif parameter == 'Temp':
+            ax.set_autoscale_on(True)
             plt.ylabel('Температура, °C')
         elif parameter == 'Pres':
+            ax.set_autoscale_on(True)
             plt.ylabel('Давление, мм/рт.ст.')
-            plt.ylim(bottom=700)
         elif parameter == 'Humidity':
+            ax.set_autoscale_on(True)
             plt.ylabel('Влажность, %')
         else:
             logging.error('Parameter is wrong!')

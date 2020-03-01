@@ -8,6 +8,7 @@ import logging
 import restart
 from os import name, path
 from graph import GRAPH
+from random import shuffle
 
 
 async def find_proxy():
@@ -132,9 +133,13 @@ async def logic(bot):
         elif message_text == '/log':
             asyncio.ensure_future(bot.send_file(user_id, f'{path}bot.log', 'log.txt', reply_markup=kb_start2))
         elif message_text == '/restart':
+            restart_str_list = ['Нет конечно!', 'Да, перезапуск!', 'Нет!', 'Неееет!']
+            shuffle(restart_str_list)
+            kb_restart = []
+            for i in list(restart_str_list):
+                kb_restart.append([i])
             asyncio.ensure_future(bot.send_message(user_id, 'Вы уверены?',
-                                                   reply_markup=tg_api.KeyboardBuilder(
-                                                       [['Нет конечно!'], ['Да, перезапуск!'], ['Нет!']])))
+                                                   reply_markup=tg_api.KeyboardBuilder(kb_restart)))
             RESTART_FLAG = 1
         elif message_text == '/back':
             asyncio.ensure_future(
@@ -175,7 +180,7 @@ async def logic(bot):
             elif data.split('+')[0] == '-raw':
                 asyncio.ensure_future(bot.send_file(user_id,
                                                     path + '/' + 'data' + '/' + data.split('+')[1] + '.csv',
-                                                    filename='data.split('+')[1]'+'.txt',
+                                                    filename=data.split('+')[1]+'.txt',
                                                     reply_markup=kb_start2))
 
         elif data[0] == '=':
@@ -216,15 +221,15 @@ async def aio_session(proxy_local):
         task_bot = asyncio.ensure_future(logic(tg_bot), loop=ioloop)
         task_get_info = asyncio.ensure_future(graph.get_info(session), loop=ioloop)
         while 1:
-            if bool(task_bot.done()):
-                task_bot.result()
+            if task_bot.done():  # check if our task done
+                task_bot.result()  # will raise error if task finished incorrectly
                 task_bot = asyncio.ensure_future(logic(tg_bot), loop=ioloop)
-            if bool(task_get_info.done()):
+            if task_get_info.done():
                 task_get_info.result()
             if ioloop.time() - minute >= 60.0:
-                minute += 60.0
+                minute += 60.0  # maybe we have waited a bit more than expected but this trick will compensate it
                 task_get_info = asyncio.ensure_future(graph.get_info(session), loop=ioloop)
-
+            await asyncio.sleep(0.5)  # we need to give control back to event loop
 
 if __name__ == '__main__':
     if name == 'nt':
