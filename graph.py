@@ -1,7 +1,8 @@
 import asyncio
 from aiohttp import ClientTimeout
 import matplotlib.pyplot as plt
-from matplotlib.dates import DateFormatter
+from matplotlib.dates import DateFormatter, MinuteLocator, HourLocator
+from matplotlib.ticker import NullFormatter
 from bs4 import BeautifulSoup
 import csv
 import logging
@@ -169,12 +170,28 @@ class GRAPH:
                 datetime.strptime(i, '%H:%M:%S')
             )
         data = data['data']
-        data_formatter = DateFormatter('%H:%M')
         plt.plot(time_local, data, marker='.')
         plt.xlim(left=time_local[0], right=time_local[-1])  # invert x axis
         plt.gcf().autofmt_xdate()
         ax = plt.gca()  # gca stands for 'get current axis'
+        data_formatter = DateFormatter('%H:%M')
         ax.xaxis.set_major_formatter(data_formatter)
+        all_labels = ax.xaxis.get_ticklabels()
+        labels_count = len(all_labels)
+        if labels_count < 20:
+            ax.xaxis.set_major_locator(MinuteLocator(byminute=range(60)))
+        elif labels_count < 40:
+            ax.xaxis.set_major_locator(MinuteLocator(byminute=range(0, 60, 2)))
+            ax.xaxis.set_minor_formatter(NullFormatter())
+            ax.xaxis.set_minor_locator(MinuteLocator(byminute=range(1, 60, 2)))
+        else:
+            ax.xaxis.set_major_locator(MinuteLocator(byminute=range(0, 60, 3)))
+            ax.xaxis.set_minor_formatter(NullFormatter())
+            every_third_minute = list(range(0, 60, 3))
+            every_minute = list(range(0, 60, 3))
+            ax.xaxis.set_minor_locator(MinuteLocator(
+                byminute=
+                [i for i in every_minute if i not in every_third_minute]))
         plt.xlabel('Время')
         if parameter == 'PM2.5':
             plt.ylabel('Частицы PM2.5, мкгр/м³')
@@ -193,6 +210,7 @@ class GRAPH:
             logging.error('Parameter is wrong!')
             return None
         plt.title('Данные метеостанции в Точке Кипения г.Троицк')
+        plt.subplots_adjust(bottom=0.5)
         buf = BytesIO()
         plt.savefig(buf, format='png')
         buf.seek(0)
@@ -210,9 +228,9 @@ class GRAPH:
         data_to_graph = []
         minutes_to_graph = []
         for i in range(2, len(data_temp), 3):
-            avg = round((data_temp[i-2]+data_temp[i-1]+data_temp[i])/3, 2)
+            avg = round((data_temp[i - 2] + data_temp[i - 1] + data_temp[i]) / 3, 2)
             data_to_graph.append(avg)
-            minutes_to_graph.append(minutes_temp[i-1])
+            minutes_to_graph.append(minutes_temp[i - 1])
         data_return = dict(data=data_to_graph, time=minutes_to_graph)
         return self.plot_minutes(data_return, parameter)
 
@@ -256,7 +274,7 @@ class GRAPH:
             plt.gca().set_autoscale_on(True)
         elif parameter == 'Pres':
             plt.ylabel('Давление, мм/рт.ст.')
-            plt.ylim(bottom=min(y1)-10, top=max(y2)+10)
+            plt.ylim(bottom=min(y1) - 10, top=max(y2) + 10)
             plt.gca().set_autoscale_on(True)
         elif parameter == 'Humidity':
             plt.ylabel('Влажность, %')
@@ -322,12 +340,12 @@ class GRAPH:
 
     def dates(self):  # returns all the files in dates order
         if name == 'nt':
-            files = listdir(self.prog_path+'\\data')
+            files = listdir(self.prog_path + '\\data')
         else:
-            files = listdir(self.prog_path+'/data')
+            files = listdir(self.prog_path + '/data')
 
         # delete .csv from file name + delete today file
-        files = [i[0:-4] for i in files if i != datetime.now().strftime('%d-%m-%Y')+'.csv']
+        files = [i[0:-4] for i in files if i != datetime.now().strftime('%d-%m-%Y') + '.csv']
         temp_list = []
         for i in files:
             temp = i.split('-')
