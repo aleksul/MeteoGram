@@ -113,7 +113,8 @@ class GRAPH:
                     float(read_list[i][parameter])
                 )
                 time_to_graph.append(
-                    read_list[i]['Time']
+                    datetime.strptime(date+read_list[i]['Time'],
+                                      '%d-%m-%Y%H:%M:%S')
                 )
             else:
                 break
@@ -163,35 +164,40 @@ class GRAPH:
         if data is None:
             logging.error("Can't plot the graph, no data!")
             return None
-        minutes = data['time']
-        time_local = []
-        for i in minutes:
-            time_local.append(
-                datetime.strptime(i, '%H:%M:%S')
-            )
+        time_local = data['time']
         data = data['data']
         plt.plot(time_local, data, marker='.')
-        plt.xlim(left=time_local[0], right=time_local[-1])  # invert x axis
+        plt.xlim(left=time_local[0] + timedelta(minutes=1),
+                 right=time_local[-1] - timedelta(minutes=1))  # invert x axis
         plt.gcf().autofmt_xdate()
         ax = plt.gca()  # gca stands for 'get current axis'
+        labels_count = time_local[0]-time_local[-1]
         data_formatter = DateFormatter('%H:%M')
         ax.xaxis.set_major_formatter(data_formatter)
-        all_labels = ax.xaxis.get_ticklabels()
-        labels_count = len(all_labels)
-        if labels_count < 20:
+        if labels_count <= timedelta(minutes=15):
             ax.xaxis.set_major_locator(MinuteLocator(byminute=range(60)))
-        elif labels_count < 40:
+        elif labels_count <= timedelta(minutes=30):
             ax.xaxis.set_major_locator(MinuteLocator(byminute=range(0, 60, 2)))
             ax.xaxis.set_minor_formatter(NullFormatter())
             ax.xaxis.set_minor_locator(MinuteLocator(byminute=range(1, 60, 2)))
-        else:
-            ax.xaxis.set_major_locator(MinuteLocator(byminute=range(0, 60, 3)))
+        elif labels_count <= timedelta(hours=1):
+            ticks_minute = list(range(0, 60, 5))
+            ax.xaxis.set_major_locator(MinuteLocator(byminute=ticks_minute))
             ax.xaxis.set_minor_formatter(NullFormatter())
-            every_third_minute = list(range(0, 60, 3))
-            every_minute = list(range(0, 60, 3))
+            every_minute = list(range(0, 60))
             ax.xaxis.set_minor_locator(MinuteLocator(
                 byminute=
-                [i for i in every_minute if i not in every_third_minute]))
+                [i for i in every_minute if i not in ticks_minute]))
+        elif labels_count <= timedelta(hours=3):
+            ticks_minute = list(range(0, 60, 10))
+            ax.xaxis.set_major_locator(MinuteLocator(byminute=ticks_minute))
+            ax.xaxis.set_minor_formatter(NullFormatter())
+            every_minute = list(range(0, 60))
+            ax.xaxis.set_minor_locator(MinuteLocator(
+                byminute=
+                [i for i in every_minute if i not in ticks_minute]))
+        else:
+            raise MeteoError
         plt.xlabel('Время')
         if parameter == 'PM2.5':
             plt.ylabel('Частицы PM2.5, мкгр/м³')
@@ -210,7 +216,6 @@ class GRAPH:
             logging.error('Parameter is wrong!')
             return None
         plt.title('Данные метеостанции в Точке Кипения г.Троицк')
-        plt.subplots_adjust(bottom=0.5)
         buf = BytesIO()
         plt.savefig(buf, format='png')
         buf.seek(0)
