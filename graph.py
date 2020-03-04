@@ -1,12 +1,12 @@
 import asyncio
 from aiohttp import ClientTimeout
 import matplotlib.pyplot as plt
-from matplotlib.dates import DateFormatter, MinuteLocator, HourLocator
+from matplotlib.dates import DateFormatter, MinuteLocator
 from matplotlib.ticker import NullFormatter
 from bs4 import BeautifulSoup
 import csv
 import logging
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta, time, date
 from os import path, stat, name, remove, listdir
 from io import BytesIO
 from restart import MeteoError
@@ -17,9 +17,9 @@ class GRAPH:
         self.ip_add = 'http://' + ip + '/values'
         if prog_path is None:
             if name == 'nt':
-                self.prog_path = path.dirname(__file__) + '\\'
+                self.prog_path = path.dirname(__file__) + '\\data\\'
             else:
-                self.prog_path = '/home/pi/bot/'
+                self.prog_path = '/home/pi/bot/data/'
         else:
             self.prog_path = prog_path
         self.timeout = ClientTimeout(total=timeout)
@@ -40,7 +40,10 @@ class GRAPH:
                 bad_requests += 1
                 return await self.get_info(session, bad_requests=bad_requests)
         else:
-            return self.csv_write(data)
+            if data:
+                return self.csv_write(data)
+            else:
+                return None
 
     @staticmethod
     def html_parser(text):
@@ -51,7 +54,11 @@ class GRAPH:
             i = soup[i].get_text()
             i = i.replace(u'\xa0', u' ')  # change space to SPACE (I'm just normalizing the string)
             i = i.split()  # separate value from measurement units
-            data_to_write.append(float(i.pop(0)))
+            temp = i.pop(0)
+            if temp == '-':
+                logging.warning("Received empty values")
+                return None
+            data_to_write.append(float(temp))
         data_to_write[3] = round(data_to_write[3] * 100 / 133, 2)  # hPa to mm Hg
         data_to_write.append(datetime.now().strftime('%H:%M:%S'))  # adds time value
         return data_to_write
@@ -64,10 +71,10 @@ class GRAPH:
         logging.debug('Wrote info to the file')
         return None
 
-    def csv_path(self, date=None, new_file=True, bad_tries=0):  # creates new file or show previous
-        if date is None:
-            date = datetime.now().strftime('%d-%m-%Y')
-        file_path = self.prog_path + 'data/' + date + '.csv'
+    def csv_path(self, date_local=None, new_file=True, bad_tries=0):  # creates new file or show previous
+        if date_local is None:
+            date_local = datetime.now().strftime('%d-%m-%Y')
+        file_path = self.prog_path + date_local + '.csv'
         if (not path.exists(file_path)) or (stat(file_path).st_size == 0):  # check if we have a file
             if new_file:
                 logging.debug(f'Create new file: {file_path}')
@@ -82,139 +89,127 @@ class GRAPH:
                 else:
                     bad_tries += 1
                     logging.debug("Didn't find anything, try previous date")
-                    return self.csv_path(self.previous_date(date), new_file=False, bad_tries=bad_tries)
+                    return self.csv_path(date_local=self.previous_date(date_local), new_file=False, bad_tries=bad_tries)
         return file_path
 
     def read_last(self):  # reads last data
-        date = datetime.now().strftime('%d-%m-%Y')
-        file_path = self.csv_path(date=date, new_file=False)  # the name of file we will read
+        date_local = datetime.now().strftime('%d-%m-%Y')
+        file_path = self.csv_path(date_local=date_local, new_file=False)  # the name of file we will read
         logging.debug(f'Reading file: {file_path}')
         with open(file_path, 'r') as f:
             reader = csv.DictReader(f)  # read the file as csv table
             read_list = list(reader)
         return read_list[-1]
 
-    def read_csv(self, parameter: str, minutes: int, date=None, previous_data=None, previous_time=None):
-        # returns last _minutes_ values
+    def read_csv_timedelta(self, parameter: str, start: datetime, end: datetime):
+        if parameter not in ['PM2.5', 'PM10', 'Temp', 'Pres', 'Humidity']:
+            logging.error(f'Parameter is wrong: {parameter}')
+            return None
+        if end > start:
+            start, end = end, start
+        date1 = start.date()
+        date2 = end.date()
+        files_to_read = [date1.strftime('%d-%m-%Y')+'.csv']
+        one_day = timedelta(days=1)
+        while date1-date2 >= one_day:
+            date1 -= one_day
+            files_to_read.append(date1.strftime('%d-%m-%Y')+'.csv')
+        all_files = listdir(self.prog_path)
+        for file in files_to_read:
+            if file not in all_files:
+                logging.error(f'Can not build the graph because we do not have file: {file}')
+                return None
         data_to_graph = []
         time_to_graph = []
-        if date is None:
-            date = datetime.now().strftime('%d-%m-%Y')
-        file_path = self.csv_path(date=date, new_file=False)  # the name of file we will read
-        logging.debug(f'Reading file: {file_path}')
-        with open(file_path, 'r') as f:
-            reader = csv.DictReader(f)  # read the file as csv table
-            read_list = list(reader)
-        counter = 0
-        for i in range(len(read_list) - 1, -1, -1):  # read all the data backwards
-            if counter < minutes:  # read until needed limit
-                counter += 1
-                data_to_graph.append(
-                    float(read_list[i][parameter])
-                )
-                time_to_graph.append(
-                    datetime.strptime(date+read_list[i]['Time'],
-                                      '%d-%m-%Y%H:%M:%S')
-                )
-            else:
-                break
-        if previous_data and previous_time:  # if we called the function recursively
-            for i in data_to_graph:
-                previous_data.append(i)
-            for i in time_to_graph:
-                previous_time.append(i)
-            data_to_graph = previous_data
-            time_to_graph = previous_time
-        if counter < minutes:  # if that's the end of file
-            return self.read_csv(parameter=parameter, minutes=minutes - counter,
-                                 date=self.previous_date(date),
-                                 previous_data=data_to_graph, previous_time=time_to_graph)
-        else:
-            return {'data': data_to_graph, 'time': time_to_graph}
-
-    def read_all_csv(self, parameter: str, date: str):  # returns all data for one day
-        data_to_graph = []
-        time_to_graph = []
-        file_path = self.csv_path(date=date, new_file=False)
-        logging.debug(f'Reading all file: {file_path}')
-        with open(file_path, 'r') as f:
-            reader = csv.DictReader(f)  # read the file as csv table
-            read_list = list(reader)
-        for i in range(len(read_list)):  # read all the data
-            data_to_graph.append(
-                float(read_list[i][parameter])
-            )
-            time_to_graph.append(
-                read_list[i]['Time']
-            )
+        for file in files_to_read:
+            reading_file = self.prog_path + file
+            with open(reading_file, 'r') as f:
+                read = list(csv.DictReader(f))  # read the file as csv table
+            read.reverse()
+            for temp in read:
+                temp_datetime = datetime.strptime(file[0:-4]+'-'+temp['Time'], '%d-%m-%Y-%H:%M:%S')
+                if start > temp_datetime > end:
+                    data_to_graph.append(float(temp[parameter]))
+                    time_to_graph.append(temp_datetime)
         return {'data': data_to_graph, 'time': time_to_graph}
 
     def read_month(self, parameter: str):  # returns min and max for every saved day (file)
         files = self.dates()
         max_list = []
         min_list = []
-        for i in files:
-            read_day = self.read_all_csv(parameter, i)
+        dates = []
+        for file in files:
+            file = file.split('-')
+            file = [int(i) for i in file]
+            date1 = datetime(file[2], file[1], file[0], 0, 0, 0)
+            date2 = datetime(file[2], file[1], file[0], 23, 59, 59)
+            dates.append(date(file[2], file[1], file[0]))
+            read_day = self.read_csv_timedelta(parameter, date1, date2)
             max_list.append(max(read_day['data']))
             min_list.append(min(read_day['data']))
-        return {'min': min_list, 'max': max_list, 'dates': files}
+        return {'min': min_list, 'max': max_list, 'dates': dates}
 
     @staticmethod
-    def plot_minutes(data, parameter):  # plots a graph for x last minutes (x should be <100)
+    def plot_minutes(data, parameter):  # plots a graph for x last minutes
         if data is None:
             logging.error("Can't plot the graph, no data!")
             return None
         time_local = data['time']
         data = data['data']
+        labels_count = len(data)  # counts how much points we have to know time-step
+        if labels_count > 100:
+            data_temp = data
+            minutes_temp = time_local
+            data = []
+            time_local = []
+            for i in range(2, len(data_temp), 3):  # counts averange of three nearest points
+                data.append(round((data_temp[i - 2] + data_temp[i - 1] + data_temp[i]) / 3, 2))
+                time_local.append(minutes_temp[i - 1])
         plt.plot(time_local, data, marker='.')
         plt.xlim(left=time_local[0] + timedelta(minutes=1),
-                 right=time_local[-1] - timedelta(minutes=1))  # invert x axis
-        plt.gcf().autofmt_xdate()
+                 right=time_local[-1] - timedelta(minutes=1))  # invert x axis + add extra space on y-axis
+        plt.gcf().autofmt_xdate()  # rotate the date
         ax = plt.gca()  # gca stands for 'get current axis'
-        labels_count = time_local[0]-time_local[-1]
         data_formatter = DateFormatter('%H:%M')
         ax.xaxis.set_major_formatter(data_formatter)
-        if labels_count <= timedelta(minutes=15):
+        if labels_count <= 15:
             ax.xaxis.set_major_locator(MinuteLocator(byminute=range(60)))
-        elif labels_count <= timedelta(minutes=30):
+        elif labels_count <= 30:
             ax.xaxis.set_major_locator(MinuteLocator(byminute=range(0, 60, 2)))
             ax.xaxis.set_minor_formatter(NullFormatter())
             ax.xaxis.set_minor_locator(MinuteLocator(byminute=range(1, 60, 2)))
-        elif labels_count <= timedelta(hours=1):
+        elif labels_count <= 60:
             ticks_minute = list(range(0, 60, 5))
             ax.xaxis.set_major_locator(MinuteLocator(byminute=ticks_minute))
             ax.xaxis.set_minor_formatter(NullFormatter())
             every_minute = list(range(0, 60))
             ax.xaxis.set_minor_locator(MinuteLocator(
-                byminute=
-                [i for i in every_minute if i not in ticks_minute]))
-        elif labels_count <= timedelta(hours=3):
+                byminute=[i for i in every_minute if i not in ticks_minute]))
+        elif labels_count <= 180:
             ticks_minute = list(range(0, 60, 10))
             ax.xaxis.set_major_locator(MinuteLocator(byminute=ticks_minute))
             ax.xaxis.set_minor_formatter(NullFormatter())
             every_minute = list(range(0, 60))
             ax.xaxis.set_minor_locator(MinuteLocator(
-                byminute=
-                [i for i in every_minute if i not in ticks_minute]))
+                byminute=[i for i in every_minute if i not in ticks_minute]))
         else:
-            raise MeteoError
+            logging.error('Wrong label counter!')
+            return None
         plt.xlabel('Время')
         if parameter == 'PM2.5':
             plt.ylabel('Частицы PM2.5, мкгр/м³')
         elif parameter == 'PM10':
             plt.ylabel('Частицы PM10, мкгр/м³')
         elif parameter == 'Temp':
-            ax.set_autoscale_on(True)
             plt.ylabel('Температура, °C')
         elif parameter == 'Pres':
             plt.ylabel('Давление, мм/рт.ст.')
-            ax.set_autoscale_on(True)
         elif parameter == 'Humidity':
             plt.ylabel('Влажность, %')
-            ax.set_autoscale_on(True)
         else:
             logging.error('Parameter is wrong!')
             return None
+        ax.set_autoscale_on(True)
         plt.title('Данные метеостанции в Точке Кипения г.Троицк')
         buf = BytesIO()
         plt.savefig(buf, format='png')
@@ -223,21 +218,6 @@ class GRAPH:
         buf.close()
         plt.close()
         return buffer
-
-    def plot_three_hours(self, data, parameter):  # counts average of three nearest points and uses plot_minutes then
-        if data is None:
-            logging.error("Can't plot the graph, no data!")
-            return None
-        minutes_temp = data['time']
-        data_temp = data['data']
-        data_to_graph = []
-        minutes_to_graph = []
-        for i in range(2, len(data_temp), 3):
-            avg = round((data_temp[i - 2] + data_temp[i - 1] + data_temp[i]) / 3, 2)
-            data_to_graph.append(avg)
-            minutes_to_graph.append(minutes_temp[i - 1])
-        data_return = dict(data=data_to_graph, time=minutes_to_graph)
-        return self.plot_minutes(data_return, parameter)
 
     @staticmethod
     def plot_day(data: dict, parameter: str):  # plots graph of a day with min and max for four time periods
@@ -253,8 +233,7 @@ class GRAPH:
         twelve_pm = time(0, 0, 0)
         q1, q2, q3, q4 = [], [], [], []
         for i in range(len(minutes)):
-            time_temp = minutes[i].split(':')
-            time_temp = time(int(time_temp[0]), int(time_temp[1]), int(time_temp[2]))
+            time_temp = minutes[i].time()
             if four_am <= time_temp < ten_am:
                 q1.append(float(data[i]))  # morning
             elif ten_am <= time_temp < four_pm:
@@ -276,17 +255,15 @@ class GRAPH:
             plt.ylabel('Частицы PM10, мкгр/м³')
         elif parameter == 'Temp':
             plt.ylabel('Температура, °C')
-            plt.gca().set_autoscale_on(True)
         elif parameter == 'Pres':
             plt.ylabel('Давление, мм/рт.ст.')
             plt.ylim(bottom=min(y1) - 10, top=max(y2) + 10)
-            plt.gca().set_autoscale_on(True)
         elif parameter == 'Humidity':
             plt.ylabel('Влажность, %')
-            plt.gca().set_autoscale_on(True)
         else:
             logging.error('Parameter is wrong!')
             return None
+        plt.gca().set_autoscale_on(True)
         plt.legend([min_bar, max_bar], ['Минимум', 'Максимум'],
                    bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
                    ncol=2, mode="expand", borderaxespad=0.)
@@ -310,27 +287,24 @@ class GRAPH:
         dates = data['dates']
         min_line, = plt.plot(dates, min_list, marker='.', color='blue', label='Минимум')
         max_line, = plt.plot(dates, max_list, marker='.', color='orange', label='Максимум')
-        plt.xlim(left=dates[-1], right=dates[0])  # invert x axis
+        plt.xlim(left=dates[-1]-timedelta(days=1), right=dates[0]+timedelta(days=1))  # invert x axis
         plt.gcf().autofmt_xdate()
         ax = plt.gca()  # gca stands for 'get current axis'
-        all_labels = ax.xaxis.get_ticklabels()
         plt.xlabel('Дни')
         if parameter == 'PM2.5':
             plt.ylabel('Частицы PM2.5, мкгр/м³')
         elif parameter == 'PM10':
             plt.ylabel('Частицы PM10, мкгр/м³')
         elif parameter == 'Temp':
-            ax.set_autoscale_on(True)
             plt.ylabel('Температура, °C')
         elif parameter == 'Pres':
-            ax.set_autoscale_on(True)
             plt.ylabel('Давление, мм/рт.ст.')
         elif parameter == 'Humidity':
-            ax.set_autoscale_on(True)
             plt.ylabel('Влажность, %')
         else:
             logging.error('Parameter is wrong!')
             return None
+        ax.set_autoscale_on(True)
         plt.legend([min_line, max_line], ['Минимум', 'Максимум'],
                    bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
                    ncol=2, mode="expand", borderaxespad=0.)
@@ -344,11 +318,7 @@ class GRAPH:
         return buffer
 
     def dates(self):  # returns all the files in dates order
-        if name == 'nt':
-            files = listdir(self.prog_path + '\\data')
-        else:
-            files = listdir(self.prog_path + '/data')
-
+        files = listdir(self.prog_path)
         # delete .csv from file name + delete today file
         files = [i[0:-4] for i in files if i != datetime.now().strftime('%d-%m-%Y') + '.csv']
         temp_list = []
@@ -362,17 +332,17 @@ class GRAPH:
         return files
 
     @staticmethod
-    def previous_date(date: str):  # receives date as 01-01-2020 and returns previous date as 31-12-2019
-        date = date.split('-')
-        date = datetime(int(date[2]), int(date[1]), int(date[0]))
-        date -= timedelta(days=1)
-        return date.strftime('%d-%m-%Y')
+    def previous_date(date_local: str):  # receives date as 01-01-2020 and returns previous date as 31-12-2019
+        date_local = date_local.split('-')
+        date_local = datetime(int(date_local[2]), int(date_local[1]), int(date_local[0]))
+        date_local -= timedelta(days=1)
+        return date_local.strftime('%d-%m-%Y')
 
     def delete_old(self, days_to_save=30, files_num=1):  # deletes old files (calls every time new file creates)
         old_file_date = datetime.now() - timedelta(days=days_to_save)
         one_day_delta = timedelta(days=1)
         for i in range(files_num):
-            file_path = self.prog_path + 'data/' + old_file_date.strftime('%d-%m-%Y') + '.csv'
+            file_path = self.prog_path + old_file_date.strftime('%d-%m-%Y') + '.csv'
             logging.debug(f'File that should be removed:{file_path}')
             if path.exists(file_path):
                 remove(file_path)

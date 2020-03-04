@@ -9,6 +9,7 @@ import restart
 from os import name, path
 from graph import GRAPH
 from random import shuffle
+from datetime import datetime, timedelta
 
 
 async def find_proxy():
@@ -185,24 +186,28 @@ async def logic(bot):
 
         elif data[0] == '=':
             data = data[1:].split('+')
-            if data[1] in ['15', '30', '60']:  # minutes
-                asyncio.ensure_future(bot.send_photo(user_id,
-                                                     graph.plot_minutes(
-                                                         graph.read_csv(data[0], int(data[1])),
-                                                         data[0])
-                                                     ))
-            elif data[1] == '180':  # 3 hours
-                asyncio.ensure_future(bot.send_photo(user_id,
-                                                     graph.plot_three_hours(
-                                                         graph.read_csv(data[0], int(data[1])),
-                                                         data[0])
-                                                     ))
+            if data[1] in ['15', '30', '60', '180']:  # minutes
+                plot_data = graph.read_csv_timedelta(data[0], datetime.now(),
+                                                     datetime.now()-timedelta(minutes=int(data[1])))
+                if plot_data:
+                    asyncio.ensure_future(bot.send_photo(user_id,
+                                                         graph.plot_minutes(plot_data, data[0])))
+                else:
+                    asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
             elif data[1] == 'day':  # one day
-                asyncio.ensure_future(bot.send_photo(user_id,
-                                                     graph.plot_day(
-                                                         graph.read_all_csv(data[0], data[2]),
-                                                         data[0])
-                                                     ))
+                date = data[2].split('-')
+                date = [int(i) for i in date]
+                date1 = datetime(date[2], date[1], date[0], 0, 0, 0)
+                date2 = datetime(date[2], date[1], date[0], 23, 59, 59)
+                plot_data = graph.read_csv_timedelta(data[0], date1, date2)
+                if plot_data:
+                    asyncio.ensure_future(bot.send_photo(user_id,
+                                                         graph.plot_day(
+                                                             plot_data,
+                                                             data[0])
+                                                         ))
+                else:
+                    asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
             elif data[1] == 'month':  # month
                 asyncio.ensure_future(bot.send_photo(user_id,
                                                      graph.plot_month(
