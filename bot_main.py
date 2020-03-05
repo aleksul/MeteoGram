@@ -142,6 +142,11 @@ async def logic(bot):
             asyncio.ensure_future(bot.send_message(user_id, 'Вы уверены?',
                                                    reply_markup=tg_api.KeyboardBuilder(kb_restart)))
             RESTART_FLAG = 1
+        elif message_text == '/clear':
+            with open(path+'bot.log', 'w'):
+                pass
+            logging.info('Cleared log')
+            asyncio.ensure_future(bot.send_message(user_id, 'Готово!', reply_markup=kb_admin))
         elif message_text == '/back':
             asyncio.ensure_future(
                 bot.send_message(user_id, 'Возвращаю нормальную клавиатуру :)', reply_markup=kb_start2))
@@ -249,7 +254,7 @@ if __name__ == '__main__':
     logging.info('Program started')
 
     ADMIN_ID = ['196846654', '463145322']
-    ADMIN_COMMANDS = ['/admin', '/log', '/restart', '/back']
+    ADMIN_COMMANDS = ['/admin', '/log', '/restart', '/clear', '/back']
     RESTART_FLAG = 0
 
     tkbot_token = '1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw'
@@ -257,7 +262,7 @@ if __name__ == '__main__':
 
     kb_start = tg_api.KeyboardBuilder([['/now', '/graph', '/raw'], ['/help']], one_time_keyboard=False)
     kb_start2 = tg_api.KeyboardBuilder([['/now'], ['/graph', '/raw']], one_time_keyboard=False)
-    kb_admin = tg_api.KeyboardBuilder([['/log', '/restart'], ['/back']])
+    kb_admin = tg_api.KeyboardBuilder([['/log', '/restart'], ['/clear', '/back']])
     bt_month = tg_api.InlineButtonBuilder('Месяц', callback_data='+month')
     bt_day = tg_api.InlineButtonBuilder('День', callback_data='-day')
     bt_3h = tg_api.InlineButtonBuilder('3 часа', callback_data='+180')

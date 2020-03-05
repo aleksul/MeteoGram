@@ -1,7 +1,7 @@
 import asyncio
 from aiohttp import ClientTimeout
 import matplotlib.pyplot as plt
-from matplotlib.dates import DateFormatter, MinuteLocator
+from matplotlib.dates import DateFormatter, MinuteLocator, AutoDateLocator
 from matplotlib.ticker import NullFormatter
 from bs4 import BeautifulSoup
 import csv
@@ -170,8 +170,7 @@ class GRAPH:
                  right=time_local[-1] - timedelta(minutes=1))  # invert x axis + add extra space on y-axis
         plt.gcf().autofmt_xdate()  # rotate the date
         ax = plt.gca()  # gca stands for 'get current axis'
-        data_formatter = DateFormatter('%H:%M')
-        ax.xaxis.set_major_formatter(data_formatter)
+        ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))  # sets major formatter to '23:59'
         if labels_count <= 15:
             ax.xaxis.set_major_locator(MinuteLocator(byminute=range(60)))
         elif labels_count <= 30:
@@ -251,15 +250,19 @@ class GRAPH:
         max_bar = plt.bar(x=x, height=y2, color='orange', width=0.3, align='edge', label='Максимум')
         if parameter == 'PM2.5':
             plt.ylabel('Частицы PM2.5, мкгр/м³')
+            plt.ylim(bottom=0, top=max(y2) + 1)
         elif parameter == 'PM10':
             plt.ylabel('Частицы PM10, мкгр/м³')
+            plt.ylim(bottom=0, top=max(y2) + 1)
         elif parameter == 'Temp':
             plt.ylabel('Температура, °C')
+            plt.ylim(bottom=min(y1) - 1, top=max(y2) + 1)
         elif parameter == 'Pres':
             plt.ylabel('Давление, мм/рт.ст.')
-            plt.ylim(bottom=min(y1) - 10, top=max(y2) + 10)
+            plt.ylim(bottom=min(y1) - 3, top=max(y2) + 3)
         elif parameter == 'Humidity':
             plt.ylabel('Влажность, %')
+            plt.ylim(bottom=min(y1) - 3, top=max(y2) + 3)
         else:
             logging.error('Parameter is wrong!')
             return None
@@ -267,7 +270,7 @@ class GRAPH:
         plt.legend([min_bar, max_bar], ['Минимум', 'Максимум'],
                    bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
                    ncol=2, mode="expand", borderaxespad=0.)
-        plt.xlabel('Время суток')
+        plt.xlabel(f"Время суток {minutes[0].date().strftime('%d.%m.%y')}")
         plt.title('Данные метеостанции в Точке Кипения г.Троицк', pad=27)
         buf = BytesIO()
         plt.savefig(buf, format='png')
@@ -287,9 +290,11 @@ class GRAPH:
         dates = data['dates']
         min_line, = plt.plot(dates, min_list, marker='.', color='blue', label='Минимум')
         max_line, = plt.plot(dates, max_list, marker='.', color='orange', label='Максимум')
-        plt.xlim(left=dates[-1]-timedelta(days=1), right=dates[0]+timedelta(days=1))  # invert x axis
+        plt.xlim(left=dates[-1]+timedelta(days=1), right=dates[0]-timedelta(days=1))  # invert x axis
         plt.gcf().autofmt_xdate()
         ax = plt.gca()  # gca stands for 'get current axis'
+        ax.xaxis.set_major_formatter(DateFormatter('%d.%m.%y'))
+        ax.xaxis.set_major_locator(AutoDateLocator(minticks=15, maxticks=None, interval_multiples=True))
         plt.xlabel('Дни')
         if parameter == 'PM2.5':
             plt.ylabel('Частицы PM2.5, мкгр/м³')
