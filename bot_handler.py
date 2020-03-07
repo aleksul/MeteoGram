@@ -84,10 +84,12 @@ class BotHandler:
         else:
             return None
 
-    async def send_photo(self, chat_id, read, reply_markup=None, bad_asserts=0):
+    async def send_photo(self, chat_id, read, caption=None, reply_markup=None, bad_asserts=0):
         params = dict(chat_id=chat_id)
         if reply_markup:
             params.update(reply_markup=reply_markup)
+        if caption:
+            params.update(caption=caption)
         data = FormData()
         data.add_field('photo',
                        read)
