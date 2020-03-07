@@ -94,8 +94,10 @@ async def logic(bot):
                 if len(keyboard[strings_num]) > 2:
                     keyboard.append([])
                     strings_num += 1
+                pretty_date = i.split('-')
+                pretty_date = pretty_date[0]+'.'+pretty_date[1]+'.'+pretty_date[2]
                 keyboard[strings_num].append(
-                    tg_api.InlineButtonBuilder(i, callback_data='-raw+' + i)
+                    tg_api.InlineButtonBuilder(pretty_date, callback_data='-raw+' + i)
                 )
             asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
                                                    reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
@@ -178,8 +180,10 @@ async def logic(bot):
                     if len(keyboard[strings_num]) > 2:
                         keyboard.append([])
                         strings_num += 1
+                    pretty_date = i.split('-')
+                    pretty_date = pretty_date[0] + '.' + pretty_date[1] + '.' + pretty_date[2]
                     keyboard[strings_num].append(
-                        tg_api.InlineButtonBuilder(i, callback_data='+day+' + i)
+                        tg_api.InlineButtonBuilder(pretty_date, callback_data='+day+' + i)
                     )
                 asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
                                                        reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
@@ -195,8 +199,11 @@ async def logic(bot):
                 plot_data = graph.read_csv_timedelta(data[0], datetime.now(),
                                                      datetime.now()-timedelta(minutes=int(data[1])))
                 if plot_data:
-                    asyncio.ensure_future(bot.send_photo(user_id,
-                                                         graph.plot_minutes(plot_data, data[0])))
+                    photo = graph.plot_minutes(plot_data, data[0])
+                    if photo:
+                        asyncio.ensure_future(bot.send_photo(user_id, photo))
+                    else:
+                        asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
                 else:
                     asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
             elif data[1] == 'day':  # one day
@@ -206,19 +213,21 @@ async def logic(bot):
                 date2 = datetime(date[2], date[1], date[0], 23, 59, 59)
                 plot_data = graph.read_csv_timedelta(data[0], date1, date2)
                 if plot_data:
-                    asyncio.ensure_future(bot.send_photo(user_id,
-                                                         graph.plot_day(
-                                                             plot_data,
-                                                             data[0])
-                                                         ))
+                    photo = graph.plot_day(plot_data, data[0])
+                    if photo:
+                        asyncio.ensure_future(bot.send_photo(user_id, photo,
+                                                             caption=f'Данные за: {date[0]}.{date[1]}.{date[2]}'))
+                    else:
+                        asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
                 else:
                     asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
             elif data[1] == 'month':  # month
-                asyncio.ensure_future(bot.send_photo(user_id,
-                                                     graph.plot_month(
-                                                         graph.read_month(data[0]),
-                                                         data[0]
-                                                     )))
+                plot_data = graph.read_month(data[0])
+                photo = graph.plot_month(plot_data, data[0])
+                if photo:
+                    asyncio.ensure_future(bot.send_photo(user_id, photo))
+                else:
+                    asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
 
     else:
         asyncio.ensure_future(bot.send_message(user_id, 'Данный тип данных не поддерживается'))

@@ -1,7 +1,7 @@
 import asyncio
 from aiohttp import ClientTimeout
 import matplotlib.pyplot as plt
-from matplotlib.dates import DateFormatter, MinuteLocator, AutoDateLocator
+from matplotlib.dates import DateFormatter, MinuteLocator, DayLocator
 from matplotlib.ticker import NullFormatter
 from bs4 import BeautifulSoup
 import csv
@@ -128,7 +128,7 @@ class GRAPH:
             read.reverse()
             for temp in read:
                 temp_datetime = datetime.strptime(file[0:-4]+'-'+temp['Time'], '%d-%m-%Y-%H:%M:%S')
-                if start > temp_datetime > end:
+                if start >= temp_datetime >= end:
                     data_to_graph.append(float(temp[parameter]))
                     time_to_graph.append(temp_datetime)
         return {'data': data_to_graph, 'time': time_to_graph}
@@ -270,7 +270,7 @@ class GRAPH:
         plt.legend([min_bar, max_bar], ['Минимум', 'Максимум'],
                    bbox_to_anchor=(0., 1.02, 1., .102), loc='lower left',
                    ncol=2, mode="expand", borderaxespad=0.)
-        plt.xlabel(f"Время суток {minutes[0].date().strftime('%d.%m.%y')}")
+        plt.xlabel("Время суток")
         plt.title('Данные метеостанции в Точке Кипения г.Троицк', pad=27)
         buf = BytesIO()
         plt.savefig(buf, format='png')
@@ -288,13 +288,17 @@ class GRAPH:
         min_list = data['min']
         max_list = data['max']
         dates = data['dates']
+        if min_list is None or max_list is None or dates is None:
+            logging.error("Can't plot the graph, no data!")
+            return None
         min_line, = plt.plot(dates, min_list, marker='.', color='blue', label='Минимум')
         max_line, = plt.plot(dates, max_list, marker='.', color='orange', label='Максимум')
         plt.xlim(left=dates[-1]+timedelta(days=1), right=dates[0]-timedelta(days=1))  # invert x axis
         plt.gcf().autofmt_xdate()
         ax = plt.gca()  # gca stands for 'get current axis'
         ax.xaxis.set_major_formatter(DateFormatter('%d.%m.%y'))
-        ax.xaxis.set_major_locator(AutoDateLocator(minticks=15, maxticks=None, interval_multiples=True))
+        ax.xaxis.set_major_locator(DayLocator(interval=2))
+        ax.xaxis.set_minor_locator(DayLocator())
         plt.xlabel('Дни')
         if parameter == 'PM2.5':
             plt.ylabel('Частицы PM2.5, мкгр/м³')
