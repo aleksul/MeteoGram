@@ -1,9 +1,8 @@
 import asyncio
+from os import path, stat
 import aiohttp
 import logging
-
 from aiohttp import FormData
-
 from restart import SendError, GetUpdatesError
 
 
@@ -16,6 +15,8 @@ class BotHandler:
         self.tg_timeout = timeout
         self.api_url = f"https://api.telegram.org/bot{token}/"
         self.offset = None
+        self.get_tries = 5
+        self.send_tries = 3
 
     async def get_updates(self, bad_updates=0):
         params = {'timeout': self.tg_timeout}
@@ -30,7 +31,7 @@ class BotHandler:
                 result = result['result']
         except Exception as err:
             logging.error(f"Pull error: {type(err)}:{err}")
-            if bad_updates >= 5:
+            if bad_updates >= self.get_tries:
                 logging.critical('Too many bad updates!')
                 raise GetUpdatesError
             else:
@@ -67,7 +68,7 @@ class BotHandler:
                 assert resp.status == 200
         except AssertionError:
             logging.warning('Assertion error!')
-            if bad_asserts >= 3:
+            if bad_asserts >= self.send_tries:
                 logging.critical('Too many bad asserts (send message)!')
                 raise SendError
             else:
@@ -79,7 +80,7 @@ class BotHandler:
                                                reply_markup=reply_markup,
                                                bad_asserts=bad_asserts)
         except Exception as err:
-            logging.critical(f"Send error: {type(err)}:{err}")
+            logging.critical(f"Send message error: {type(err)}:{err}")
             raise SendError
         else:
             return None
@@ -101,7 +102,7 @@ class BotHandler:
                 assert resp.status == 200
         except AssertionError:
             logging.warning('Assertion error!')
-            if bad_asserts >= 3:
+            if bad_asserts >= self.send_tries:
                 logging.critical('Too many bad asserts (send photo)!')
                 raise SendError
             else:
@@ -132,7 +133,7 @@ class BotHandler:
                 assert resp.status == 200
         except AssertionError:
             logging.warning('Assertion error!')
-            if bad_asserts >= 3:
+            if bad_asserts >= self.send_tries:
                 logging.critical('Too many bad asserts (send file)!')
                 raise SendError
             else:
@@ -145,3 +146,27 @@ class BotHandler:
             raise SendError
         else:
             return None
+
+
+class BlackList:
+    def __init__(self, file_path='/home/pi/bot/ban_list.txt'):
+        self.file_path = file_path
+        if path.exists(file_path) and stat(file_path).st_size != 0:
+            with open(file_path, "r") as f:
+                ids = f.readlines()
+            self.ids = {i[:-1:] for i in ids}
+        else:
+            self.ids = set()
+
+    def add(self, add_id: str):
+        self.ids.add(add_id)
+        self.rewrite()
+
+    def remove(self, remove_id: str):
+        self.ids.discard(remove_id)
+        self.rewrite()
+
+    def rewrite(self):
+        ids_to_write = [i + '\n' for i in self.ids]
+        with open(self.file_path, 'w') as f:
+            f.writelines(ids_to_write)

@@ -3,7 +3,7 @@ import asyncio
 import aiohttp
 import tg_api
 from inet import Proxy
-from bot_handler import BotHandler
+from bot_handler import BotHandler, BlackList
 import logging
 import restart
 from os import name, path
@@ -41,10 +41,11 @@ async def find_proxy():
 
 
 async def logic(bot):
+    global RESTART_FLAG, LAST_FIVE_RESPONSES, FINISH_START_FLAG
     update = await bot.get_updates()
     if update is None:
+        FINISH_START_FLAG = True
         return None
-    global RESTART_FLAG
     logging.debug("New message!")
     if 'callback_query' in update.keys():
         received_message = update['callback_query']['message']
@@ -61,6 +62,19 @@ async def logic(bot):
                 message_type = 'command'
                 if user_id in ADMIN_ID and message_text in ADMIN_COMMANDS:
                     message_type = 'admin_command'
+    if user_id in ban.ids:
+        return None
+    if FINISH_START_FLAG:
+        LAST_FIVE_RESPONSES[4], LAST_FIVE_RESPONSES[3], LAST_FIVE_RESPONSES[2], LAST_FIVE_RESPONSES[1] = \
+            LAST_FIVE_RESPONSES[3], LAST_FIVE_RESPONSES[2], LAST_FIVE_RESPONSES[1], LAST_FIVE_RESPONSES[0]
+        LAST_FIVE_RESPONSES[0] = {'user_id': user_id, 'time': datetime.now()}
+        ids = {i['user_id'] for i in LAST_FIVE_RESPONSES}
+        if len(ids) == 1 and \
+                LAST_FIVE_RESPONSES[0]['time']-LAST_FIVE_RESPONSES[4]['time'] <= timedelta(seconds=1):
+            ban.add(user_id)
+            logging.info(f'User {received_message["chat"]["first_name"]} with id:{user_id} was added to blacklist')
+            asyncio.ensure_future(bot.send_message(user_id, 'Вы были добавлены в черный список'))
+            return None
 
     logging.debug(f'Message type: {message_type}')
     user_name = received_message['chat']['first_name']
@@ -247,7 +261,7 @@ async def aio_session(proxy_local):
             if ioloop.time() - minute >= 60.0:
                 minute += 60.0  # maybe we have waited a bit more than expected but this trick will compensate it
                 task_get_info = asyncio.ensure_future(graph.get_info(session), loop=ioloop)
-            await asyncio.sleep(0.5)  # we need to give control back to event loop
+            await asyncio.sleep(0.1)  # we need to give control back to event loop
 
 if __name__ == '__main__':
     if name == 'nt':
@@ -263,6 +277,9 @@ if __name__ == '__main__':
 
     ADMIN_ID = ['196846654', '463145322']
     ADMIN_COMMANDS = ['/admin', '/log', '/restart', '/clear_log', '/black_list', '/back']
+
+    empty_user = dict(user_id='0', time=datetime.now())
+    LAST_FIVE_RESPONSES = [empty_user, empty_user, empty_user, empty_user, empty_user]
 
     RESTART_FLAG = 0
     restart_str_list = ['Нет конечно!', 'Да, перезапуск!', 'Нет!', 'Неееет!']
@@ -284,6 +301,9 @@ if __name__ == '__main__':
     kb_choose_time = tg_api.InlineMarkupBuilder([[bt_15min, bt_30min, bt_1h], [bt_3h, bt_day], [bt_month]])
 
     graph = GRAPH('192.168.0.175', data_path=path+'data/', timeout=5)
+
+    ban = BlackList(file_path=path+'ban_list.txt')
+    FINISH_START_FLAG = False
 
     asyncio.set_event_loop(asyncio.new_event_loop())
     ioloop = asyncio.get_event_loop()
