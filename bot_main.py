@@ -136,7 +136,6 @@ async def logic(bot):
         elif message_text == '/log':
             asyncio.ensure_future(bot.send_file(user_id, f'{path}bot.log', 'log.txt', reply_markup=kb_start2))
         elif message_text == '/restart':
-            restart_str_list = ['Нет конечно!', 'Да, перезапуск!', 'Нет!', 'Неееет!']
             shuffle(restart_str_list)
             kb_restart = []
             for i in list(restart_str_list):
@@ -144,7 +143,7 @@ async def logic(bot):
             asyncio.ensure_future(bot.send_message(user_id, 'Вы уверены?',
                                                    reply_markup=tg_api.KeyboardBuilder(kb_restart)))
             RESTART_FLAG = 1
-        elif message_text == '/clear':
+        elif message_text == '/clear_log':
             with open(path+'bot.log', 'w'):
                 pass
             logging.info('Cleared log')
@@ -263,15 +262,19 @@ if __name__ == '__main__':
     logging.info('Program started')
 
     ADMIN_ID = ['196846654', '463145322']
-    ADMIN_COMMANDS = ['/admin', '/log', '/restart', '/clear', '/back']
+    ADMIN_COMMANDS = ['/admin', '/log', '/restart', '/clear_log', '/black_list', '/back']
+
     RESTART_FLAG = 0
+    restart_str_list = ['Нет конечно!', 'Да, перезапуск!', 'Нет!', 'Неееет!']
 
     tkbot_token = '1012565455:AAGctwGzz0LRlucqZiiEIvchtLhJjd1Fqdw'
     # tkbot_token = '1061976169:AAFUJ1rnKXmhbMN5POAPk1DxdY0MPQZlwuk'
 
     kb_start = tg_api.KeyboardBuilder([['/now', '/graph', '/raw'], ['/help']], one_time_keyboard=False)
     kb_start2 = tg_api.KeyboardBuilder([['/now'], ['/graph', '/raw']], one_time_keyboard=False)
-    kb_admin = tg_api.KeyboardBuilder([['/log', '/restart'], ['/clear', '/back']])
+
+    kb_admin = tg_api.KeyboardBuilder([['/log', '/restart'], ['/clear_log', '/back']])
+
     bt_month = tg_api.InlineButtonBuilder('Месяц', callback_data='+month')
     bt_day = tg_api.InlineButtonBuilder('День', callback_data='-day')
     bt_3h = tg_api.InlineButtonBuilder('3 часа', callback_data='+180')
@@ -279,7 +282,9 @@ if __name__ == '__main__':
     bt_30min = tg_api.InlineButtonBuilder('Полчаса', callback_data='+30')
     bt_15min = tg_api.InlineButtonBuilder('15 минут', callback_data='+15')
     kb_choose_time = tg_api.InlineMarkupBuilder([[bt_15min, bt_30min, bt_1h], [bt_3h, bt_day], [bt_month]])
-    graph = GRAPH()
+
+    graph = GRAPH('192.168.0.175', data_path=path+'data/', timeout=5)
+
     asyncio.set_event_loop(asyncio.new_event_loop())
     ioloop = asyncio.get_event_loop()
     task_proxy = ioloop.create_task(find_proxy())
@@ -290,7 +295,7 @@ if __name__ == '__main__':
         task_proxy.cancel()
         ioloop.stop()
         ioloop.close()
-        restart.program(3)
+        restart.program(path+'bot_main.py', 10)
     else:
         if proxy:
             proxy_str = f'http://{proxy}'
@@ -303,6 +308,6 @@ if __name__ == '__main__':
         finally:
             ioloop.stop()
             ioloop.close()
-            restart.program(1)
+            restart.program(path+'bot_main.py', 10)
 else:
     logging.critical(f'__Name__ is NOT equal main! It is {__name__}')

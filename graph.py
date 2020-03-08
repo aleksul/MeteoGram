@@ -7,21 +7,15 @@ from bs4 import BeautifulSoup
 import csv
 import logging
 from datetime import datetime, timedelta, time, date
-from os import path, stat, name, remove, listdir
+from os import path, stat, remove, listdir
 from io import BytesIO
 from restart import MeteoError
 
 
 class GRAPH:
-    def __init__(self, ip='192.168.0.175', prog_path=None, timeout=15):
+    def __init__(self, ip: str, data_path='/home/pi/bot/data/', timeout=15):
         self.ip_add = 'http://' + ip + '/values'
-        if prog_path is None:
-            if name == 'nt':
-                self.prog_path = path.dirname(__file__) + '\\data\\'
-            else:
-                self.prog_path = '/home/pi/bot/data/'
-        else:
-            self.prog_path = prog_path
+        self.data_path = data_path
         self.timeout = ClientTimeout(total=timeout)
 
     async def get_info(self, session, bad_requests=0):
@@ -74,7 +68,7 @@ class GRAPH:
     def csv_path(self, date_local=None, new_file=True, bad_tries=0):  # creates new file or show previous
         if date_local is None:
             date_local = datetime.now().strftime('%d-%m-%Y')
-        file_path = self.prog_path + date_local + '.csv'
+        file_path = self.data_path + date_local + '.csv'
         if (not path.exists(file_path)) or (stat(file_path).st_size == 0):  # check if we have a file
             if new_file:
                 logging.debug(f'Create new file: {file_path}')
@@ -114,7 +108,7 @@ class GRAPH:
         while date1-date2 >= one_day:
             date1 -= one_day
             files_to_read.append(date1.strftime('%d-%m-%Y')+'.csv')
-        all_files = listdir(self.prog_path)
+        all_files = listdir(self.data_path)
         for file in files_to_read:
             if file not in all_files:
                 logging.error(f'Can not build the graph because we do not have file: {file}')
@@ -122,7 +116,7 @@ class GRAPH:
         data_to_graph = []
         time_to_graph = []
         for file in files_to_read:
-            reading_file = self.prog_path + file
+            reading_file = self.data_path + file
             with open(reading_file, 'r') as f:
                 read = list(csv.DictReader(f))  # read the file as csv table
             read.reverse()
@@ -327,7 +321,7 @@ class GRAPH:
         return buffer
 
     def dates(self):  # returns all the files in dates order
-        files = listdir(self.prog_path)
+        files = listdir(self.data_path)
         # delete .csv from file name + delete today file
         files = [i[0:-4] for i in files if i != datetime.now().strftime('%d-%m-%Y') + '.csv']
         temp_list = []
@@ -351,7 +345,7 @@ class GRAPH:
         old_file_date = datetime.now() - timedelta(days=days_to_save)
         one_day_delta = timedelta(days=1)
         for i in range(files_num):
-            file_path = self.prog_path + old_file_date.strftime('%d-%m-%Y') + '.csv'
+            file_path = self.data_path + old_file_date.strftime('%d-%m-%Y') + '.csv'
             logging.debug(f'File that should be removed:{file_path}')
             if path.exists(file_path):
                 remove(file_path)

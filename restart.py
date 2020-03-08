@@ -4,7 +4,7 @@ Note: this function does not return.
 Any cleanup action (like saving data) must be done before calling this function.
 """
 import logging
-from os import name, path, spawnv, P_NOWAIT
+from os import spawnv, P_NOWAIT
 from sys import executable, argv
 from time import sleep
 
@@ -33,14 +33,10 @@ class InternetConnectionError(RestartError):
     pass
 
 
-def program(secs_of_sleep):
-    if name == 'nt':
-        prog_path = path.dirname(__file__) + '\\'
-    else:
-        prog_path = '/home/pi/bot/'
+def program(file_path: str, secs_of_sleep: int):
     logging.info(f"Restart in {secs_of_sleep} seconds!")
     sleep(secs_of_sleep)
-    logging.info(f'Restart on {name}')
+    logging.info(f'Restart!')
     python = executable
-    spawnv(P_NOWAIT, python, [python, prog_path+'bot_main.py', *argv])
+    spawnv(P_NOWAIT, python, [python, file_path, *argv])
     exit()

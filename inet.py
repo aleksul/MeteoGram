@@ -58,7 +58,7 @@ class Proxy:
             logging.debug(f'Find 5 proxy: {proxy_temp}')
             return await self.saver(proxy_temp)
 
-    async def check(self, proxy: str, session):  # simply tests access to the site via proxy
+    async def check(self, proxy: str, session: aiohttp.ClientSession):  # simply tests access to the site via proxy
         site = self.site_to_test
         proxy = "http://" + proxy
         ping = clock()
