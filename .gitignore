@@ -1,5 +1,6 @@
 __pycache__/
 .idea/
 data/
-proxy.txt
+proxy.dat
 bot.log
+ban_list.dat

@@ -13,9 +13,6 @@ from datetime import datetime, timedelta
 
 
 async def find_proxy():
-    inet = Proxy(timeout=3,
-                 filename=f'{path}proxy.txt',
-                 site_to_test=f'https://api.telegram.org/bot{tkbot_token}/getMe')
     results_temp = await asyncio.gather(inet.internet_check('http://example.org/'),
                                         inet.internet_check(f'https://api.telegram.org/bot{tkbot_token}/getMe'))
     if results_temp[0]['site'] == 'http://example.org/':
@@ -41,12 +38,17 @@ async def find_proxy():
 
 
 async def logic(bot):
-    global RESTART_FLAG, LAST_FIVE_RESPONSES, FINISH_START_FLAG
+    global RESTART_FLAG, LAST_USERS
+
+    # getting update
+
     update = await bot.get_updates()
     if update is None:
-        FINISH_START_FLAG = True
+        LAST_USERS.clear()  # if no update comes - clear all the dict
         return None
-    logging.debug("New message!")
+
+    # parsing update
+
     if 'callback_query' in update.keys():
         received_message = update['callback_query']['message']
         message_type = 'callback_query'
@@ -62,22 +64,48 @@ async def logic(bot):
                 message_type = 'command'
                 if user_id in ADMIN_ID and message_text in ADMIN_COMMANDS:
                     message_type = 'admin_command'
+    user_name = received_message['chat']['first_name']
+
+    # working with black_list
+
     if user_id in ban.ids:
         return None
-    if FINISH_START_FLAG:
-        LAST_FIVE_RESPONSES[4], LAST_FIVE_RESPONSES[3], LAST_FIVE_RESPONSES[2], LAST_FIVE_RESPONSES[1] = \
-            LAST_FIVE_RESPONSES[3], LAST_FIVE_RESPONSES[2], LAST_FIVE_RESPONSES[1], LAST_FIVE_RESPONSES[0]
-        LAST_FIVE_RESPONSES[0] = {'user_id': user_id, 'time': datetime.now()}
-        ids = {i['user_id'] for i in LAST_FIVE_RESPONSES}
-        if len(ids) == 1 and \
-                LAST_FIVE_RESPONSES[0]['time']-LAST_FIVE_RESPONSES[4]['time'] <= timedelta(seconds=1):
-            ban.add(user_id)
-            logging.info(f'User {received_message["chat"]["first_name"]} with id:{user_id} was added to blacklist')
-            asyncio.ensure_future(bot.send_message(user_id, 'Вы были добавлены в черный список'))
-            return None
 
-    logging.debug(f'Message type: {message_type}')
-    user_name = received_message['chat']['first_name']
+    now = datetime.now()
+    if user_id in LAST_USERS.keys():  # if user already in dict
+        LAST_USERS[user_id][0] += 1  # +1 update
+        LAST_USERS[user_id][2] = now  # change last update time
+
+        # check if its necessary to add user to black_list
+
+        last_updates = LAST_USERS[user_id]
+        num_of_updates = last_updates[0]
+        spam_bool = (last_updates[2] - last_updates[1]) / num_of_updates <= zero_seconds  # how fast new messages coming
+        if num_of_updates == 30 and spam_bool:
+            logging.debug(f"Pretend that user {user_name} (id: {user_id}) is spamming!")
+            return asyncio.ensure_future(bot.send_message(user_id, 'Пожалуйста, не спамьте!\n'
+                                                                   'У меня вообще-то черный список есть...',
+                                                          reply_markup=tg_api.ReplyKeyboardRemove))
+        elif num_of_updates == 40 and spam_bool:
+            return asyncio.ensure_future(bot.send_message(user_id, 'Последний раз предупреждаю!',
+                                                          reply_markup=tg_api.ReplyKeyboardRemove))
+        elif num_of_updates == 49 and spam_bool:
+            return asyncio.ensure_future(bot.send_message(user_id, 'Еще одно сообщение и в бан!',
+                                                          reply_markup=tg_api.ReplyKeyboardRemove))
+        elif num_of_updates >= 50 and spam_bool:
+            ban.add(user_id)
+            logging.info(f'User {user_name} (id: {user_id}) was added to blacklist')
+            LAST_USERS.pop(user_id)  # delete user from dict
+            return asyncio.ensure_future(bot.send_message(user_id, 'Вы были добавлены в черный список.'))
+        elif num_of_updates > 30 and spam_bool:
+            return None  # don't answer anything if we pretend that user is spamming
+
+    elif user_id not in ADMIN_ID:  # if user isn't admin...
+        # add user to the dict with 3 parameters: number of updates, time of the first update, time of the last one
+        LAST_USERS.update({user_id: [1, now, now]})
+
+    # working with commands
+
     if message_type == 'command':
         if message_text == '/start':
             asyncio.ensure_future(bot.send_message(user_id, f'Приветствую, {user_name}! \n'
@@ -99,8 +127,7 @@ async def logic(bot):
                                                             f'Давление: {now["Pres"]} мм/рт.ст.\n'
                                                             f'Влажность: {now["Humidity"]} %\n'
                                                             f'Частицы PM2.5: {now["PM2.5"]} мкгр/м³\n'
-                                                            f'Частицы PM10: {now["PM10"]} мкгр/м³',
-                                                   reply_markup=kb_start2))
+                                                            f'Частицы PM10: {now["PM10"]} мкгр/м³'))
         elif message_text == '/raw':
             keyboard = [[]]
             strings_num = 0
@@ -261,7 +288,7 @@ async def aio_session(proxy_local):
             if ioloop.time() - minute >= 60.0:
                 minute += 60.0  # maybe we have waited a bit more than expected but this trick will compensate it
                 task_get_info = asyncio.ensure_future(graph.get_info(session), loop=ioloop)
-            await asyncio.sleep(0.1)  # we need to give control back to event loop
+            await asyncio.sleep(0)  # we need to give control back to event loop
 
 if __name__ == '__main__':
     if name == 'nt':
@@ -277,9 +304,6 @@ if __name__ == '__main__':
 
     ADMIN_ID = ['196846654', '463145322']
     ADMIN_COMMANDS = ['/admin', '/log', '/restart', '/clear_log', '/black_list', '/back']
-
-    empty_user = dict(user_id='0', time=datetime.now())
-    LAST_FIVE_RESPONSES = [empty_user, empty_user, empty_user, empty_user, empty_user]
 
     RESTART_FLAG = 0
     restart_str_list = ['Нет конечно!', 'Да, перезапуск!', 'Нет!', 'Неееет!']
@@ -302,8 +326,13 @@ if __name__ == '__main__':
 
     graph = GRAPH('192.168.0.175', data_path=path+'data/', timeout=5)
 
-    ban = BlackList(file_path=path+'ban_list.txt')
-    FINISH_START_FLAG = False
+    ban = BlackList(file_path=path+'ban_list.dat')
+    LAST_USERS = {}
+    zero_seconds = timedelta(seconds=0.5)
+
+    inet = Proxy(timeout=3,
+                 filename=f'{path}proxy.dat',
+                 site_to_test=f'https://api.telegram.org/bot{tkbot_token}/getMe')
 
     asyncio.set_event_loop(asyncio.new_event_loop())
     ioloop = asyncio.get_event_loop()
