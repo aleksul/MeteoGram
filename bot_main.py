@@ -108,26 +108,26 @@ async def logic(bot):
 
     if message_type == 'command':
         if message_text == '/start':
-            asyncio.ensure_future(bot.send_message(user_id, f'Приветствую, {user_name}! \n'
-                                                            f'Я бот, который поможет тебе '
-                                                            f'узнать метеоданные в Троицке!',
-                                                   reply_markup=kb_start))
+            return asyncio.ensure_future(bot.send_message(user_id, f'Приветствую, {user_name}! \n'
+                                                                   f'Я бот, который поможет тебе '
+                                                                   f'узнать метеоданные в Троицке!',
+                                                          reply_markup=kb_start))
         elif message_text == '/help':
-            asyncio.ensure_future(bot.send_message(user_id, 'Все чрезвычайно просто:\n'
-                                                            '• для просмотра текущего состояния напиши /now\n'
-                                                            '• для построения графика напиши /graph\n'
-                                                            '• для просмотра сырого файла напиши /raw\n\n'
-                                                            'Интересуют подробности отображаемых измерений?\n'
-                                                            'Напиши /info',
-                                                   reply_markup=kb_start2))
+            return asyncio.ensure_future(bot.send_message(user_id, 'Все чрезвычайно просто:\n'
+                                                                   '• для просмотра текущего состояния напиши /now\n'
+                                                                   '• для построения графика напиши /graph\n'
+                                                                   '• для просмотра сырого файла напиши /raw\n\n'
+                                                                   'Интересуют подробности отображаемых измерений?\n'
+                                                                   'Напиши /info',
+                                                          reply_markup=kb_start2))
         elif message_text == '/now':
             now = graph.read_last()
-            asyncio.ensure_future(bot.send_message(user_id, f'Данные собраны в {now["Time"]}\n\n'
-                                                            f'Температура: {now["Temp"]} °C\n'
-                                                            f'Давление: {now["Pres"]} мм/рт.ст.\n'
-                                                            f'Влажность: {now["Humidity"]} %\n'
-                                                            f'Частицы PM2.5: {now["PM2.5"]} мкгр/м³\n'
-                                                            f'Частицы PM10: {now["PM10"]} мкгр/м³'))
+            return asyncio.ensure_future(bot.send_message(user_id, f'Данные собраны в {now["Time"]}\n\n'
+                                                                   f'Температура: {now["Temp"]} °C\n'
+                                                                   f'Давление: {now["Pres"]} мм/рт.ст.\n'
+                                                                   f'Влажность: {now["Humidity"]} %\n'
+                                                                   f'Частицы PM2.5: {now["PM2.5"]} мкгр/м³\n'
+                                                                   f'Частицы PM10: {now["PM10"]} мкгр/м³'))
         elif message_text == '/raw':
             keyboard = [[]]
             strings_num = 0
@@ -136,61 +136,75 @@ async def logic(bot):
                     keyboard.append([])
                     strings_num += 1
                 pretty_date = i.split('-')
-                pretty_date = pretty_date[0]+'.'+pretty_date[1]+'.'+pretty_date[2]
+                pretty_date = pretty_date[0] + '.' + pretty_date[1] + '.' + pretty_date[2]
                 keyboard[strings_num].append(
                     tg_api.InlineButtonBuilder(pretty_date, callback_data='-raw+' + i)
                 )
-            asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
-                                                   reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
+            return asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
+                                                          reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
         elif message_text == '/graph':
-            asyncio.ensure_future(bot.send_message(user_id, 'Выберите временной промежуток:',
-                                                   reply_markup=kb_choose_time))
+            return asyncio.ensure_future(bot.send_message(user_id, 'Выберите временной промежуток:',
+                                                          reply_markup=kb_choose_time))
         elif message_text == '/info':
-            asyncio.ensure_future(bot.send_message(user_id, 'Где производится замер?\n'
-                                                            'Метеостанция располгается по адресу: г.Москва, г.Троицк, '
-                                                            'Сиреневый бульвар, д.1, снаружи "Точки Кипения"\n\n'
-                                                            'Как определяется время суток на графике дня?\n'
-                                                            '4:00-10:00 - утро\n'
-                                                            '10:00-16:00 - день\n'
-                                                            '16:00-22:00 - вечер\n'
-                                                            '22:00-4:00 - ночь\n\n'
-                                                            'Что такое частицы PM2.5 и PM10?\n'
-                                                            'Это мелкодисперсные частицы пыли, которые, '
-                                                            'буквально, "витают в воздухе". '
-                                                            'Из-за их малых размеров (2.5 мкм и 10 мкм соответсвенно) '
-                                                            'и веса они практически не осядают, таким образом загрязняя'
-                                                            ' воздух, которым мы дышим.\n'
-                                                            'Согласно ВОЗ, среднесуточный уровень этих частиц '
-                                                            'не должен быть больше 25 мкгр/м³\n'
-                                                            'Подробнее можно прочитать, например, здесь:\n'
-                                                            'https://habr.com/ru/company/tion/blog/396111/',
-                                                   reply_markup=kb_start2))
+            return asyncio.ensure_future(bot.send_message(user_id, 'Где производится замер?\n'
+                                                                   'Метеостанция располгается по адресу: '
+                                                                   'г.Москва, г.Троицк, '
+                                                                   'Сиреневый бульвар, д.1, снаружи "Точки Кипения"\n\n'
+                                                                   'Как определяется время суток на графике дня?\n'
+                                                                   '4:00-10:00 - утро\n'
+                                                                   '10:00-16:00 - день\n'
+                                                                   '16:00-22:00 - вечер\n'
+                                                                   '22:00-4:00 - ночь\n\n'
+                                                                   'Что такое частицы PM2.5 и PM10?\n'
+                                                                   'Это мелкодисперсные частицы пыли, которые, '
+                                                                   'буквально, "витают в воздухе". '
+                                                                   'Из-за их малых размеров '
+                                                                   '(2.5 мкм и 10 мкм соответсвенно) '
+                                                                   'и веса они практически не осядают, '
+                                                                   'таким образом загрязняя'
+                                                                   ' воздух, которым мы дышим.\n'
+                                                                   'Согласно ВОЗ, среднесуточный уровень этих частиц '
+                                                                   'не должен быть больше 25 мкгр/м³\n'
+                                                                   'Подробнее можно прочитать, например, здесь:\n'
+                                                                   'https://habr.com/ru/company/tion/blog/396111/',
+                                                          reply_markup=kb_start2))
         else:
-            asyncio.ensure_future(bot.send_message(user_id, 'Неверная команда!\nДля вывода подсказки напишите /help'))
+            return asyncio.ensure_future(
+                bot.send_message(user_id, 'Неверная команда!\nДля вывода подсказки напишите /help'))
 
     elif message_type == 'admin_command':
         if message_text == '/admin':
-            asyncio.ensure_future(bot.send_message(user_id, f'Наконец то мой дорогой админ {user_name} '
-                                                            f'добрался до раздела админских возможностей! '
-                                                            f'Что интересует?',
-                                                   reply_markup=kb_admin))
+            return asyncio.ensure_future(bot.send_message(user_id, f'Наконец то мой дорогой админ {user_name} '
+                                                                   f'добрался до раздела админских возможностей!\n\n'
+                                                                   f'Что интересует?\n'
+                                                                   f'• Напишите /log для получения файла логов,'
+                                                                   f' /clear_log для того чтобы его отчистить\n'
+                                                                   f'• Напишите /restart для '
+                                                                   f'принудительной перезагрузки\n'
+                                                                   f'• Напишите /black_list для '
+                                                                   f'работы с черным списком\n'
+                                                                   f'• Напишите /back для '
+                                                                   f'возврашения стандартной клавиатуры',
+                                                          reply_markup=kb_admin))
         elif message_text == '/log':
-            asyncio.ensure_future(bot.send_file(user_id, f'{path}bot.log', 'log.txt', reply_markup=kb_start2))
+            return asyncio.ensure_future(bot.send_file(user_id, f'{path}bot.log', 'log.txt'))
         elif message_text == '/restart':
             shuffle(restart_str_list)
             kb_restart = []
             for i in list(restart_str_list):
                 kb_restart.append([i])
-            asyncio.ensure_future(bot.send_message(user_id, 'Вы уверены?',
-                                                   reply_markup=tg_api.KeyboardBuilder(kb_restart)))
             RESTART_FLAG = 1
+            return asyncio.ensure_future(bot.send_message(user_id, 'Вы уверены?',
+                                                          reply_markup=tg_api.KeyboardBuilder(kb_restart)))
         elif message_text == '/clear_log':
-            with open(path+'bot.log', 'w'):
+            with open(path + 'bot.log', 'w'):  # log clearing
                 pass
             logging.info('Cleared log')
-            asyncio.ensure_future(bot.send_message(user_id, 'Готово!', reply_markup=kb_admin))
+            return asyncio.ensure_future(bot.send_message(user_id, 'Лог был отчищен!', reply_markup=kb_admin))
+        elif message_text == '/black_list':
+            return asyncio.ensure_future(bot.send_message(user_id, 'Что сделать?', reply_markup=bl_keyboard))
         elif message_text == '/back':
-            asyncio.ensure_future(
+            return asyncio.ensure_future(
                 bot.send_message(user_id, 'Возвращаю нормальную клавиатуру :)', reply_markup=kb_start2))
     elif message_type == 'text':
         if user_id in ADMIN_ID and message_text == 'Да, перезапуск!' and RESTART_FLAG:
@@ -198,10 +212,10 @@ async def logic(bot):
             await bot.send_message(user_id, 'Перезапускаюсь...', reply_markup=kb_start2)
             raise restart.UserRestart
         elif user_id in ADMIN_ID and RESTART_FLAG:
-            asyncio.ensure_future(bot.send_message(user_id, 'Перезапуск отменен', reply_markup=kb_start2))
             RESTART_FLAG = 0
+            return asyncio.ensure_future(bot.send_message(user_id, 'Перезапуск отменен', reply_markup=kb_start2))
         else:
-            asyncio.ensure_future(bot.send_message(user_id, 'Помочь с командами?\nНапиши /help'))
+            return asyncio.ensure_future(bot.send_message(user_id, 'Помочь с командами?\nНапиши /help'))
     elif message_type == 'callback_query':
         if data[0] == '+':
             bt_pm25 = tg_api.InlineButtonBuilder('Частицы PM2.5', callback_data='=PM2.5' + data)
@@ -210,8 +224,8 @@ async def logic(bot):
             bt_pres = tg_api.InlineButtonBuilder('Давление', callback_data='=Pres' + data)
             bt_humidity = tg_api.InlineButtonBuilder('Влажность', callback_data='=Humidity' + data)
             kb_choose_parameter = tg_api.InlineMarkupBuilder([[bt_pm25, bt_pm10], [bt_temp], [bt_pres, bt_humidity]])
-            asyncio.ensure_future(bot.send_message(user_id, 'Выберите параметр:',
-                                                   reply_markup=kb_choose_parameter))
+            return asyncio.ensure_future(bot.send_message(user_id, 'Выберите параметр:',
+                                                          reply_markup=kb_choose_parameter))
         elif data[0] == '-':
             if data == '-day':
                 keyboard = [[]]
@@ -225,27 +239,27 @@ async def logic(bot):
                     keyboard[strings_num].append(
                         tg_api.InlineButtonBuilder(pretty_date, callback_data='+day+' + i)
                     )
-                asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
-                                                       reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
+                return asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
+                                                              reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
             elif data.split('+')[0] == '-raw':
-                asyncio.ensure_future(bot.send_file(user_id,
-                                                    path + '/' + 'data' + '/' + data.split('+')[1] + '.csv',
-                                                    filename=data.split('+')[1]+'.txt',
-                                                    reply_markup=kb_start2))
+                return asyncio.ensure_future(bot.send_file(user_id,
+                                                           path + '/' + 'data' + '/' + data.split('+')[1] + '.csv',
+                                                           filename=data.split('+')[1] + '.txt',
+                                                           reply_markup=kb_start2))
 
         elif data[0] == '=':
             data = data[1:].split('+')
             if data[1] in ['15', '30', '60', '180']:  # minutes
                 plot_data = graph.read_csv_timedelta(data[0], datetime.now(),
-                                                     datetime.now()-timedelta(minutes=int(data[1])))
+                                                     datetime.now() - timedelta(minutes=int(data[1])))
                 if plot_data:
                     photo = graph.plot_minutes(plot_data, data[0])
                     if photo:
-                        asyncio.ensure_future(bot.send_photo(user_id, photo))
+                        return asyncio.ensure_future(bot.send_photo(user_id, photo))
                     else:
-                        asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
+                        return asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
                 else:
-                    asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
+                    return asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
             elif data[1] == 'day':  # one day
                 date = data[2].split('-')
                 date = [int(i) for i in date]
@@ -255,22 +269,34 @@ async def logic(bot):
                 if plot_data:
                     photo = graph.plot_day(plot_data, data[0])
                     if photo:
-                        asyncio.ensure_future(bot.send_photo(user_id, photo,
-                                                             caption=f'Данные за: {date[0]}.{date[1]}.{date[2]}'))
+                        return asyncio.ensure_future(bot.send_photo(user_id, photo,
+                                                                    caption=f'Данные за: {date[0]}.{date[1]}.{date[2]}')
+                                                     )
                     else:
-                        asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
+                        return asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
                 else:
-                    asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
+                    return asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
             elif data[1] == 'month':  # month
                 plot_data = graph.read_month(data[0])
                 photo = graph.plot_month(plot_data, data[0])
                 if photo:
-                    asyncio.ensure_future(bot.send_photo(user_id, photo))
+                    return asyncio.ensure_future(bot.send_photo(user_id, photo))
                 else:
-                    asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
+                    return asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
+        elif data[0] == '_':
+            data=data[1:].split('+')
+            if data[1] == 'add':
+                return None  # заглушка
+            elif data[1] == 'del':
+                return None  # заглушка
+            elif data[1] == 'ids':
+                if ban.ids:
+                    return asyncio.ensure_future(bot.send_message(user_id, f'Все id: {ban.ids}'))
+                else:
+                    return asyncio.ensure_future(bot.send_message(user_id, 'Черный список пуст!'))
 
     else:
-        asyncio.ensure_future(bot.send_message(user_id, 'Данный тип данных не поддерживается'))
+        return asyncio.ensure_future(bot.send_message(user_id, 'Данный тип данных не поддерживается'))
 
 
 async def aio_session(proxy_local):
@@ -279,7 +305,7 @@ async def aio_session(proxy_local):
         minute = ioloop.time()
         task_bot = asyncio.ensure_future(logic(tg_bot), loop=ioloop)
         task_get_info = asyncio.ensure_future(graph.get_info(session), loop=ioloop)
-        while 1:
+        while True:
             if task_bot.done():  # check if our task done
                 task_bot.result()  # will raise error if task finished incorrectly
                 task_bot = asyncio.ensure_future(logic(tg_bot), loop=ioloop)
@@ -288,7 +314,8 @@ async def aio_session(proxy_local):
             if ioloop.time() - minute >= 60.0:
                 minute += 60.0  # maybe we have waited a bit more than expected but this trick will compensate it
                 task_get_info = asyncio.ensure_future(graph.get_info(session), loop=ioloop)
-            await asyncio.sleep(0)  # we need to give control back to event loop
+            await asyncio.sleep(0)  # give control back to event loop
+
 
 if __name__ == '__main__':
     if name == 'nt':
@@ -314,7 +341,8 @@ if __name__ == '__main__':
     kb_start = tg_api.KeyboardBuilder([['/now', '/graph', '/raw'], ['/help']], one_time_keyboard=False)
     kb_start2 = tg_api.KeyboardBuilder([['/now'], ['/graph', '/raw']], one_time_keyboard=False)
 
-    kb_admin = tg_api.KeyboardBuilder([['/log', '/restart'], ['/clear_log', '/back']])
+    kb_admin = tg_api.KeyboardBuilder([['/log', '/restart'], ['/clear_log', '/black_list'], ['/back']],
+                                      one_time_keyboard=False)
 
     bt_month = tg_api.InlineButtonBuilder('Месяц', callback_data='+month')
     bt_day = tg_api.InlineButtonBuilder('День', callback_data='-day')
@@ -324,11 +352,15 @@ if __name__ == '__main__':
     bt_15min = tg_api.InlineButtonBuilder('15 минут', callback_data='+15')
     kb_choose_time = tg_api.InlineMarkupBuilder([[bt_15min, bt_30min, bt_1h], [bt_3h, bt_day], [bt_month]])
 
-    graph = GRAPH('192.168.0.175', data_path=path+'data/', timeout=5)
+    graph = GRAPH('192.168.0.175', data_path=path + 'data/', timeout=5)
 
-    ban = BlackList(file_path=path+'ban_list.dat')
+    ban = BlackList(file_path=path + 'ban_list.dat')
     LAST_USERS = {}
     zero_seconds = timedelta(seconds=0.5)
+    bl_add = tg_api.InlineButtonBuilder('Добавить', callback_data='_bl+add')
+    bl_del = tg_api.InlineButtonBuilder('Удалить', callback_data='_bl+del')
+    bl_ids = tg_api.InlineButtonBuilder('Просмотреть все id', callback_data='_bl+ids')
+    bl_keyboard = tg_api.InlineMarkupBuilder([[bl_add, bl_del], [bl_ids]])
 
     inet = Proxy(timeout=3,
                  filename=f'{path}proxy.dat',
@@ -344,7 +376,7 @@ if __name__ == '__main__':
         task_proxy.cancel()
         ioloop.stop()
         ioloop.close()
-        restart.program(path+'bot_main.py', 10)
+        restart.program(path + 'bot_main.py', 10)
     else:
         if proxy:
             proxy_str = f'http://{proxy}'
@@ -357,6 +389,6 @@ if __name__ == '__main__':
         finally:
             ioloop.stop()
             ioloop.close()
-            restart.program(path+'bot_main.py', 10)
+            restart.program(path + 'bot_main.py', 10)
 else:
     logging.critical(f'__Name__ is NOT equal main! It is {__name__}')
