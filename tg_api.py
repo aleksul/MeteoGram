@@ -1,6 +1,7 @@
 import json
 
 ReplyKeyboardRemove = '{"remove_keyboard": true, "selective": false}'
+Force_Reply = '{"force_reply": true, "selective": false}'
 
 
 def KeyboardButtonBuilder(button: str, request_contact=False, request_location=False):

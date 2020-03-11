@@ -64,6 +64,16 @@ async def logic(bot):
                 message_type = 'command'
                 if user_id in ADMIN_ID and message_text in ADMIN_COMMANDS:
                     message_type = 'admin_command'
+        elif message_type == 'reply_to_message':
+            message_text = received_message['text']
+            reply_message_id = int(received_message['reply_to_message']['message_id'])
+            reply_text = received_message['reply_to_message']['text']
+            message_id = int(received_message['message_id'])
+            if message_id-reply_message_id == 1:
+                one_mssg_rp = True
+            else:
+                one_mssg_rp = False
+
     user_name = received_message['chat']['first_name']
 
     # working with black_list
@@ -216,6 +226,36 @@ async def logic(bot):
             return asyncio.ensure_future(bot.send_message(user_id, 'Перезапуск отменен', reply_markup=kb_start2))
         else:
             return asyncio.ensure_future(bot.send_message(user_id, 'Помочь с командами?\nНапиши /help'))
+    elif message_type == 'reply_to_message':
+        if one_mssg_rp and user_id in ADMIN_ID:
+            if reply_text == bl_add_text:
+                if message_text.isdigit() and len(message_text) == 9:
+                    if message_text not in ban.ids:
+                        ban.add(message_text)
+                        return asyncio.ensure_future(bot.send_message(user_id, f'Пользователь (id: {message_text}) '
+                                                                               f'был добавлен в черный список'))
+                    else:
+                        return asyncio.ensure_future(bot.send_message(user_id, f"Пользователь (id: {message_text}) уже "
+                                                                               f"в черном списке"))
+                else:
+                    return asyncio.ensure_future(bot.send_message(user_id, 'Id введен неверно! Он должен содержать'
+                                                                           ' 9 цифр, и ничего более!'))
+            elif reply_text == bl_del_text:
+                if message_text.isdigit() and len(message_text) == 9:
+                    if message_text in ban.ids:
+                        ban.remove(message_text)
+                        return asyncio.ensure_future(bot.send_message(user_id, f'Пользователь (id: {message_text}) '
+                                                                               f'был удален из черного списка'))
+                    else:
+                        return asyncio.ensure_future(bot.send_message(user_id, f"Пользователь (id: {message_text}) не "
+                                                                               f"в черном списке"))
+                else:
+                    return asyncio.ensure_future(bot.send_message(user_id, 'Id введен неверно! Он должен содержать'
+                                                                           ' 9 цифр, и ничего более!'))
+            else:
+                return asyncio.ensure_future(bot.send_message(user_id, 'Помочь с командами?\nНапиши /help'))
+        else:
+            return asyncio.ensure_future(bot.send_message(user_id, 'Помочь с командами?\nНапиши /help'))
     elif message_type == 'callback_query':
         if data[0] == '+':
             bt_pm25 = tg_api.InlineButtonBuilder('Частицы PM2.5', callback_data='=PM2.5' + data)
@@ -284,14 +324,23 @@ async def logic(bot):
                 else:
                     return asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
         elif data[0] == '_':
-            data=data[1:].split('+')
+            data = data[1:].split('+')
             if data[1] == 'add':
-                return None  # заглушка
+                return asyncio.ensure_future(bot.send_message(user_id, bl_add_text,
+                                                              reply_markup=tg_api.Force_Reply))
             elif data[1] == 'del':
-                return None  # заглушка
+                if ban.ids:
+                    return asyncio.ensure_future(bot.send_message(user_id, bl_del_text,
+                                                                  reply_markup=tg_api.Force_Reply))
+                else:
+                    return asyncio.ensure_future(bot.send_message(user_id, 'Черный список пуст!'))
             elif data[1] == 'ids':
                 if ban.ids:
-                    return asyncio.ensure_future(bot.send_message(user_id, f'Все id: {ban.ids}'))
+                    pretty_ids = ''
+                    for i in ban.ids:
+                        pretty_ids += (i + ', ')
+                    pretty_ids = pretty_ids[:-2]
+                    return asyncio.ensure_future(bot.send_message(user_id, f'Все id:  {pretty_ids}'))
                 else:
                     return asyncio.ensure_future(bot.send_message(user_id, 'Черный список пуст!'))
 
@@ -358,7 +407,9 @@ if __name__ == '__main__':
     LAST_USERS = {}
     zero_seconds = timedelta(seconds=0.5)
     bl_add = tg_api.InlineButtonBuilder('Добавить', callback_data='_bl+add')
+    bl_add_text = 'В ответ на это сообщение напишите id пользователя, которого необходимо добавить:'
     bl_del = tg_api.InlineButtonBuilder('Удалить', callback_data='_bl+del')
+    bl_del_text = 'В ответ на это сообщение напишите id пользователя, которого необходимо удалить:'
     bl_ids = tg_api.InlineButtonBuilder('Просмотреть все id', callback_data='_bl+ids')
     bl_keyboard = tg_api.InlineMarkupBuilder([[bl_add, bl_del], [bl_ids]])
 
