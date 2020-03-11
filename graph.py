@@ -145,9 +145,6 @@ class GRAPH:
 
     @staticmethod
     def plot_minutes(data, parameter):  # plots a graph for x last minutes
-        if data is None:
-            logging.error("Can't plot the graph, no data!")
-            return None
         time_local = data['time']
         data = data['data']
         labels_count = len(data)  # counts how much points we have to know time-step
@@ -214,9 +211,6 @@ class GRAPH:
 
     @staticmethod
     def plot_day(data: dict, parameter: str):  # plots graph of a day with min and max for four time periods
-        if data is None:
-            logging.error("Can't plot the graph, no data!")
-            return None
         minutes = data['time']
         data = data['data']
         four_am = time(4, 0, 0)
@@ -275,15 +269,28 @@ class GRAPH:
         return buffer
 
     @staticmethod
-    def plot_month(data: dict, parameter: str):  # plots month graph with min and max values of a day
-        if data is None:
-            logging.error("Can't plot the graph, no data!")
+    def parameter_to_str(parameter: str):
+        if parameter == 'PM2.5':
+            return 'Частицы PM2.5'
+        elif parameter == 'PM10':
+            return 'Частицы PM10'
+        elif parameter == 'Temp':
+            return 'Температура'
+        elif parameter == 'Pres':
+            return 'Давление'
+        elif parameter == 'Humidity':
+            return 'Влажность'
+        else:
+            logging.error('Parameter is wrong!')
             return None
+
+    @staticmethod
+    def plot_month(data: dict, parameter: str):  # plots month graph with min and max values of a day
         min_list = data['min']
         max_list = data['max']
         dates = data['dates']
-        if min_list is None or max_list is None or dates is None:
-            logging.error("Can't plot the graph, no data!")
+        if not min_list or not max_list or not dates:
+            logging.error("Can't plot month graph, no data!")
             return None
         min_line, = plt.plot(dates, min_list, marker='.', color='blue', label='Минимум')
         max_line, = plt.plot(dates, max_list, marker='.', color='orange', label='Максимум')

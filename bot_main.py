@@ -37,6 +37,24 @@ async def find_proxy():
             raise restart.InternetConnectionError
 
 
+def time_to_str(time: str):
+    if time == '15':
+        return 'последние 15 минут'
+    elif time == '30':
+        return 'последние полчаса'
+    elif time == '60':
+        return 'последний час'
+    elif time == '180':
+        return 'последние 3 часа'
+    elif time == 'day':
+        return 'день'
+    elif time == 'month':
+        return 'месяц'
+    else:
+        logging.error(f'Wrong time: {time}')
+        return None
+
+
 async def logic(bot):
     global RESTART_FLAG, LAST_USERS
 
@@ -54,6 +72,8 @@ async def logic(bot):
         message_type = 'callback_query'
         data = update['callback_query']['data']
         user_id = str(received_message['chat']['id'])
+        message_id = received_message['message_id']
+        callback_id = update['callback_query']['id']
     else:
         received_message = update['message']
         user_id = str(received_message['chat']['id'])
@@ -69,10 +89,9 @@ async def logic(bot):
             reply_message_id = int(received_message['reply_to_message']['message_id'])
             reply_text = received_message['reply_to_message']['text']
             message_id = int(received_message['message_id'])
+            one_mssg_rp = False
             if message_id-reply_message_id == 1:
                 one_mssg_rp = True
-            else:
-                one_mssg_rp = False
 
     user_name = received_message['chat']['first_name']
 
@@ -150,8 +169,11 @@ async def logic(bot):
                 keyboard[strings_num].append(
                     tg_api.InlineButtonBuilder(pretty_date, callback_data='-raw+' + i)
                 )
-            return asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
-                                                          reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
+            if keyboard[0]:
+                return asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
+                                                              reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
+            else:
+                return asyncio.ensure_future(bot.send_message(user_id, 'Нет данных :('))
         elif message_text == '/graph':
             return asyncio.ensure_future(bot.send_message(user_id, 'Выберите временной промежуток:',
                                                           reply_markup=kb_choose_time))
@@ -186,7 +208,6 @@ async def logic(bot):
         if message_text == '/admin':
             return asyncio.ensure_future(bot.send_message(user_id, f'Наконец то мой дорогой админ {user_name} '
                                                                    f'добрался до раздела админских возможностей!\n\n'
-                                                                   f'Что интересует?\n'
                                                                    f'• Напишите /log для получения файла логов,'
                                                                    f' /clear_log для того чтобы его отчистить\n'
                                                                    f'• Напишите /restart для '
@@ -219,39 +240,47 @@ async def logic(bot):
     elif message_type == 'text':
         if user_id in ADMIN_ID and message_text == 'Да, перезапуск!' and RESTART_FLAG:
             RESTART_FLAG = 0
-            await bot.send_message(user_id, 'Перезапускаюсь...', reply_markup=kb_start2)
+            await bot.send_message(user_id, 'Перезапускаюсь...', reply_markup=kb_admin)
             raise restart.UserRestart
         elif user_id in ADMIN_ID and RESTART_FLAG:
             RESTART_FLAG = 0
-            return asyncio.ensure_future(bot.send_message(user_id, 'Перезапуск отменен', reply_markup=kb_start2))
+            return asyncio.ensure_future(bot.send_message(user_id, 'Перезапуск отменен', reply_markup=kb_admin))
         else:
             return asyncio.ensure_future(bot.send_message(user_id, 'Помочь с командами?\nНапиши /help'))
     elif message_type == 'reply_to_message':
         if one_mssg_rp and user_id in ADMIN_ID:
             if reply_text == bl_add_text:
+                asyncio.ensure_future(bot.delete_message(user_id, reply_message_id))
                 if message_text.isdigit() and len(message_text) == 9:
                     if message_text not in ban.ids:
                         ban.add(message_text)
                         return asyncio.ensure_future(bot.send_message(user_id, f'Пользователь (id: {message_text}) '
-                                                                               f'был добавлен в черный список'))
+                                                                               f'был добавлен в черный список',
+                                                                      reply_markup=kb_admin))
                     else:
                         return asyncio.ensure_future(bot.send_message(user_id, f"Пользователь (id: {message_text}) уже "
-                                                                               f"в черном списке"))
+                                                                               f"в черном списке",
+                                                                      reply_markup=kb_admin))
                 else:
                     return asyncio.ensure_future(bot.send_message(user_id, 'Id введен неверно! Он должен содержать'
-                                                                           ' 9 цифр, и ничего более!'))
+                                                                           ' 9 цифр, и ничего более!',
+                                                                  reply_markup=kb_admin))
             elif reply_text == bl_del_text:
+                asyncio.ensure_future(bot.delete_message(user_id, reply_message_id))
                 if message_text.isdigit() and len(message_text) == 9:
                     if message_text in ban.ids:
                         ban.remove(message_text)
                         return asyncio.ensure_future(bot.send_message(user_id, f'Пользователь (id: {message_text}) '
-                                                                               f'был удален из черного списка'))
+                                                                               f'был удален из черного списка',
+                                                                      reply_markup=kb_admin))
                     else:
                         return asyncio.ensure_future(bot.send_message(user_id, f"Пользователь (id: {message_text}) не "
-                                                                               f"в черном списке"))
+                                                                               f"в черном списке",
+                                                                      reply_markup=kb_admin))
                 else:
                     return asyncio.ensure_future(bot.send_message(user_id, 'Id введен неверно! Он должен содержать'
-                                                                           ' 9 цифр, и ничего более!'))
+                                                                           ' 9 цифр, и ничего более!',
+                                                                  reply_markup=kb_admin))
             else:
                 return asyncio.ensure_future(bot.send_message(user_id, 'Помочь с командами?\nНапиши /help'))
         else:
@@ -264,7 +293,7 @@ async def logic(bot):
             bt_pres = tg_api.InlineButtonBuilder('Давление', callback_data='=Pres' + data)
             bt_humidity = tg_api.InlineButtonBuilder('Влажность', callback_data='=Humidity' + data)
             kb_choose_parameter = tg_api.InlineMarkupBuilder([[bt_pm25, bt_pm10], [bt_temp], [bt_pres, bt_humidity]])
-            return asyncio.ensure_future(bot.send_message(user_id, 'Выберите параметр:',
+            return asyncio.ensure_future(bot.edit_message(user_id, message_id, text='Выберите параметр:',
                                                           reply_markup=kb_choose_parameter))
         elif data[0] == '-':
             if data == '-day':
@@ -279,9 +308,14 @@ async def logic(bot):
                     keyboard[strings_num].append(
                         tg_api.InlineButtonBuilder(pretty_date, callback_data='+day+' + i)
                     )
-                return asyncio.ensure_future(bot.send_message(user_id, 'Выберите дату:',
-                                                              reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
+                if keyboard[0]:
+                    return asyncio.ensure_future(bot.edit_message(user_id, message_id, text='Выберите дату:',
+                                                                  reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
+                else:
+                    asyncio.ensure_future(bot.delete_message(user_id, message_id))
+                    asyncio.ensure_future(bot.callback_answer(callback_id, text='Нет данных :(', show_alert=True))
             elif data.split('+')[0] == '-raw':
+                asyncio.ensure_future(bot.delete_message(user_id, message_id))
                 return asyncio.ensure_future(bot.send_file(user_id,
                                                            path + '/' + 'data' + '/' + data.split('+')[1] + '.csv',
                                                            filename=data.split('+')[1] + '.txt',
@@ -289,17 +323,24 @@ async def logic(bot):
 
         elif data[0] == '=':
             data = data[1:].split('+')
+            asyncio.ensure_future(bot.delete_message(user_id, message_id))
             if data[1] in ['15', '30', '60', '180']:  # minutes
                 plot_data = graph.read_csv_timedelta(data[0], datetime.now(),
                                                      datetime.now() - timedelta(minutes=int(data[1])))
                 if plot_data:
                     photo = graph.plot_minutes(plot_data, data[0])
                     if photo:
-                        return asyncio.ensure_future(bot.send_photo(user_id, photo))
+                        param_str = graph.parameter_to_str(data[0]).capitalize()
+                        return asyncio.ensure_future(bot.send_photo(user_id, photo,
+                                                                    caption=f'{param_str} за'
+                                                                            f' {time_to_str(data[1])}'))
                     else:
-                        return asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
+                        return asyncio.ensure_future(
+                            bot.callback_answer(callback_id, text='За этот период нет данных :(',
+                                                show_alert=True))
                 else:
-                    return asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
+                    return asyncio.ensure_future(bot.callback_answer(callback_id, text='За этот период нет данных :(',
+                                                                     show_alert=True))
             elif data[1] == 'day':  # one day
                 date = data[2].split('-')
                 date = [int(i) for i in date]
@@ -309,22 +350,31 @@ async def logic(bot):
                 if plot_data:
                     photo = graph.plot_day(plot_data, data[0])
                     if photo:
+                        param_str = graph.parameter_to_str(data[0]).capitalize()
                         return asyncio.ensure_future(bot.send_photo(user_id, photo,
-                                                                    caption=f'Данные за: {date[0]}.{date[1]}.{date[2]}')
+                                                                    caption=f'{param_str} за: '
+                                                                            f'{date[0]}.{date[1]}.{date[2]}')
                                                      )
                     else:
-                        return asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
+                        return asyncio.ensure_future(
+                            bot.callback_answer(callback_id, text='За этот период нет данных :(',
+                                                show_alert=True))
                 else:
-                    return asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
+                    return asyncio.ensure_future(bot.callback_answer(callback_id, text='За этот период нет данных :(',
+                                                                     show_alert=True))
             elif data[1] == 'month':  # month
                 plot_data = graph.read_month(data[0])
                 photo = graph.plot_month(plot_data, data[0])
                 if photo:
-                    return asyncio.ensure_future(bot.send_photo(user_id, photo))
+                    param_str = graph.parameter_to_str(data[0]).capitalize()
+                    return asyncio.ensure_future(bot.send_photo(user_id, photo, caption=f'{param_str} за последний '
+                                                                                        f'месяц'))
                 else:
-                    return asyncio.ensure_future(bot.send_message(user_id, 'За этот период нет данных :('))
+                    return asyncio.ensure_future(bot.callback_answer(callback_id, text='За этот период нет данных :(',
+                                                                     show_alert=True))
         elif data[0] == '_':
             data = data[1:].split('+')
+            asyncio.ensure_future(bot.callback_answer(callback_id))
             if data[1] == 'add':
                 return asyncio.ensure_future(bot.send_message(user_id, bl_add_text,
                                                               reply_markup=tg_api.Force_Reply))
@@ -333,16 +383,19 @@ async def logic(bot):
                     return asyncio.ensure_future(bot.send_message(user_id, bl_del_text,
                                                                   reply_markup=tg_api.Force_Reply))
                 else:
-                    return asyncio.ensure_future(bot.send_message(user_id, 'Черный список пуст!'))
+                    return asyncio.ensure_future(bot.send_message(user_id, 'Черный список пуст!',
+                                                                  reply_markup=kb_admin))
             elif data[1] == 'ids':
                 if ban.ids:
                     pretty_ids = ''
                     for i in ban.ids:
                         pretty_ids += (i + ', ')
                     pretty_ids = pretty_ids[:-2]
-                    return asyncio.ensure_future(bot.send_message(user_id, f'Все id:  {pretty_ids}'))
+                    return asyncio.ensure_future(bot.send_message(user_id, f'Все id:  {pretty_ids}',
+                                                                  reply_markup=kb_admin))
                 else:
-                    return asyncio.ensure_future(bot.send_message(user_id, 'Черный список пуст!'))
+                    return asyncio.ensure_future(bot.send_message(user_id, 'Черный список пуст!',
+                                                                  reply_markup=kb_admin))
 
     else:
         return asyncio.ensure_future(bot.send_message(user_id, 'Данный тип данных не поддерживается'))
@@ -401,7 +454,7 @@ if __name__ == '__main__':
     bt_15min = tg_api.InlineButtonBuilder('15 минут', callback_data='+15')
     kb_choose_time = tg_api.InlineMarkupBuilder([[bt_15min, bt_30min, bt_1h], [bt_3h, bt_day], [bt_month]])
 
-    graph = GRAPH('192.168.0.175', data_path=path + 'data/', timeout=5)
+    graph = GRAPH('192.168.0.175', data_path=path + 'data/', timeout=10)
 
     ban = BlackList(file_path=path + 'ban_list.dat')
     LAST_USERS = {}

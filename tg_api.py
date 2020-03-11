@@ -32,6 +32,6 @@ def InlineButtonBuilder(text: str, url=None, callback_data=None, pay=None):
     return button
 
 
-def InlineMarkupBuilder(keyboard):
+def InlineMarkupBuilder(keyboard: list):
     markup = {"inline_keyboard": keyboard}
     return json.dumps(markup)

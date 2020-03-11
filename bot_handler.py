@@ -85,6 +85,105 @@ class BotHandler:
         else:
             return None
 
+    async def edit_inline(self, chat_id: str, message_id: int, reply_markup, bad_asserts=0):
+        data = dict(chat_id=chat_id, message_id=message_id, reply_markup=reply_markup)
+        try:
+            async with self.session.post(
+                    f'https://api.telegram.org/bot{self.token}/editMessageReplyMarkup',
+                    data=data, proxy=self.proxy) as resp:
+                assert resp.status == 200
+        except AssertionError:
+            logging.warning('Assertion error!')
+            if bad_asserts >= self.send_tries:
+                logging.critical('Too many bad asserts (edit inline)!')
+                raise SendError
+            else:
+                bad_asserts += 1
+                await asyncio.sleep(1)
+                return await self.edit_inline(chat_id, message_id, reply_markup, bad_asserts=bad_asserts)
+        except Exception as err:
+            logging.critical(f"Edit inline error: {type(err)}:{err}")
+            raise SendError
+        else:
+            return None
+
+    async def edit_message(self, chat_id: str, message_id: int, text: str, reply_markup=None, bad_asserts=0):
+        data = dict(chat_id=chat_id, message_id=message_id, text=text)
+        if reply_markup:
+            data.update(reply_markup=reply_markup)
+        try:
+            async with self.session.post(
+                    f'https://api.telegram.org/bot{self.token}/editMessageText',
+                    data=data, proxy=self.proxy) as resp:
+                assert resp.status == 200
+        except AssertionError:
+            logging.warning('Assertion error!')
+            if bad_asserts >= self.send_tries:
+                logging.critical('Too many bad asserts (edit message)!')
+                raise SendError
+            else:
+                bad_asserts += 1
+                await asyncio.sleep(1)
+                return await self.edit_message(chat_id, message_id, text,
+                                               reply_markup=reply_markup, bad_asserts=bad_asserts)
+        except Exception as err:
+            logging.critical(f"Edit message error: {type(err)}:{err}")
+            raise SendError
+        else:
+            return None
+
+    async def delete_message(self, chat_id: str, message_id: int, bad_asserts=0):
+        data = dict(chat_id=chat_id, message_id=message_id)
+        try:
+            async with self.session.post(
+                    f'https://api.telegram.org/bot{self.token}/deleteMessage',
+                    data=data, proxy=self.proxy) as resp:
+                assert resp.status == 200
+        except AssertionError:
+            logging.warning('Assertion error!')
+            if bad_asserts >= self.send_tries:
+                logging.critical('Too many bad asserts (delete message)!')
+                raise SendError
+            else:
+                bad_asserts += 1
+                await asyncio.sleep(1)
+                return await self.delete_message(chat_id, message_id, bad_asserts=bad_asserts)
+        except Exception as err:
+            logging.critical(f"Delete message error: {type(err)}:{err}")
+            raise SendError
+        else:
+            return None
+
+    async def callback_answer(self, callback_id: str, text=None, show_alert=False, url=None, cache_time=0,
+                              bad_asserts=0):
+        data = dict(callback_query_id=callback_id)
+        if text:
+            data.update(text=text)
+        data.update(show_alert=show_alert)
+        if url:
+            data.update(url=url)
+        data.update(cache_time=cache_time)
+        try:
+            async with self.session.post(
+                    f'https://api.telegram.org/bot{self.token}/answerCallbackQuery',
+                    data=data, proxy=self.proxy) as resp:
+                assert resp.status == 200
+        except AssertionError:
+            logging.warning('Assertion error!')
+            if bad_asserts >= self.send_tries:
+                logging.critical('Too many bad asserts (callback_answer)!')
+                raise SendError
+            else:
+                bad_asserts += 1
+                await asyncio.sleep(1)
+                return await self.callback_answer(callback_id, text=text, show_alert=show_alert,
+                                                  url=url, cache_time=cache_time, bad_asserts=bad_asserts)
+        except Exception as err:
+            logging.critical(f"Callback answer error: {type(err)}:{err}")
+            raise SendError
+        else:
+            return None
+
     async def send_photo(self, chat_id, read, caption=None, reply_markup=None, bad_asserts=0):
         params = dict(chat_id=chat_id)
         if reply_markup:
