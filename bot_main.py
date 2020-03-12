@@ -66,25 +66,28 @@ async def logic(bot):
         return None
 
     # parsing update
+    text, command, admin_command, reply_to_message, callback_query = False, False, False, False, False
 
     if 'callback_query' in update.keys():
+        callback_query = True
         received_message = update['callback_query']['message']
-        message_type = 'callback_query'
         data = update['callback_query']['data']
         user_id = str(received_message['chat']['id'])
         message_id = received_message['message_id']
-        callback_id = update['callback_query']['id']
+        callback_id: str = update['callback_query']['id']
     else:
         received_message = update['message']
         user_id = str(received_message['chat']['id'])
         message_type = list(received_message.keys())[4]
         if message_type == 'text':
             message_text = received_message['text']
+            text = True
             if message_text[0] == '/':
-                message_type = 'command'
+                command = True
                 if user_id in ADMIN_ID and message_text in ADMIN_COMMANDS:
-                    message_type = 'admin_command'
+                    admin_command = True
         elif message_type == 'reply_to_message':
+            reply_to_message = True
             message_text = received_message['text']
             reply_message_id = int(received_message['reply_to_message']['message_id'])
             reply_text = received_message['reply_to_message']['text']
@@ -135,13 +138,47 @@ async def logic(bot):
 
     # working with commands
 
-    if message_type == 'command':
-        if message_text == '/start':
+    if admin_command:
+        if '/admin' == message_text:
+            return asyncio.ensure_future(bot.send_message(user_id, f'Наконец то мой дорогой админ {user_name} '
+                                                                   f'добрался до раздела админских возможностей!\n\n'
+                                                                   f'• Напишите /log для получения файла логов,'
+                                                                   f' /clear_log для того чтобы его отчистить\n'
+                                                                   f'• Напишите /restart для '
+                                                                   f'принудительной перезагрузки\n'
+                                                                   f'• Напишите /black_list для '
+                                                                   f'работы с черным списком\n'
+                                                                   f'• Напишите /back для '
+                                                                   f'возврашения стандартной клавиатуры',
+                                                          reply_markup=kb_admin))
+        elif '/log' == message_text:
+            return asyncio.ensure_future(bot.send_file(user_id, f'{path}bot.log', 'log.txt'))
+        elif '/restart' == message_text:
+            shuffle(restart_str_list)
+            kb_restart = []
+            for i in list(restart_str_list):
+                kb_restart.append([i])
+            RESTART_FLAG = 1
+            return asyncio.ensure_future(bot.send_message(user_id, 'Вы уверены?',
+                                                          reply_markup=tg_api.KeyboardBuilder(kb_restart)))
+        elif '/clear_log' == message_text:
+            with open(path + 'bot.log', 'w'):  # log clearing
+                pass
+            logging.info('Cleared log')
+            return asyncio.ensure_future(bot.send_message(user_id, 'Лог был отчищен!', reply_markup=kb_admin))
+        elif '/black_list' == message_text:
+            return asyncio.ensure_future(bot.send_message(user_id, 'Что сделать?', reply_markup=bl_keyboard))
+        elif '/back' == message_text:
+            return asyncio.ensure_future(
+                bot.send_message(user_id, 'Возвращаю нормальную клавиатуру :)', reply_markup=kb_start2))
+
+    elif command:
+        if '/start' == message_text:
             return asyncio.ensure_future(bot.send_message(user_id, f'Приветствую, {user_name}! \n'
                                                                    f'Я бот, который поможет тебе '
                                                                    f'узнать метеоданные в Троицке!',
                                                           reply_markup=kb_start))
-        elif message_text == '/help':
+        elif '/help' == message_text:
             return asyncio.ensure_future(bot.send_message(user_id, 'Все чрезвычайно просто:\n'
                                                                    '• для просмотра текущего состояния напиши /now\n'
                                                                    '• для построения графика напиши /graph\n'
@@ -149,7 +186,7 @@ async def logic(bot):
                                                                    'Интересуют подробности отображаемых измерений?\n'
                                                                    'Напиши /info',
                                                           reply_markup=kb_start2))
-        elif message_text == '/now':
+        elif '/now' == message_text:
             now = graph.read_last()
             return asyncio.ensure_future(bot.send_message(user_id, f'Данные собраны в {now["Time"]}\n\n'
                                                                    f'Температура: {now["Temp"]} °C\n'
@@ -157,7 +194,7 @@ async def logic(bot):
                                                                    f'Влажность: {now["Humidity"]} %\n'
                                                                    f'Частицы PM2.5: {now["PM2.5"]} мкгр/м³\n'
                                                                    f'Частицы PM10: {now["PM10"]} мкгр/м³'))
-        elif message_text == '/raw':
+        elif '/raw' == message_text:
             keyboard = [[]]
             strings_num = 0
             for i in graph.dates():
@@ -174,10 +211,10 @@ async def logic(bot):
                                                               reply_markup=tg_api.InlineMarkupBuilder(keyboard)))
             else:
                 return asyncio.ensure_future(bot.send_message(user_id, 'Нет данных :('))
-        elif message_text == '/graph':
+        elif '/graph' == message_text:
             return asyncio.ensure_future(bot.send_message(user_id, 'Выберите временной промежуток:',
                                                           reply_markup=kb_choose_time))
-        elif message_text == '/info':
+        elif '/info' == message_text:
             return asyncio.ensure_future(bot.send_message(user_id, 'Где производится замер?\n'
                                                                    'Метеостанция располгается по адресу: '
                                                                    'г.Москва, г.Троицк, '
@@ -204,40 +241,7 @@ async def logic(bot):
             return asyncio.ensure_future(
                 bot.send_message(user_id, 'Неверная команда!\nДля вывода подсказки напишите /help'))
 
-    elif message_type == 'admin_command':
-        if message_text == '/admin':
-            return asyncio.ensure_future(bot.send_message(user_id, f'Наконец то мой дорогой админ {user_name} '
-                                                                   f'добрался до раздела админских возможностей!\n\n'
-                                                                   f'• Напишите /log для получения файла логов,'
-                                                                   f' /clear_log для того чтобы его отчистить\n'
-                                                                   f'• Напишите /restart для '
-                                                                   f'принудительной перезагрузки\n'
-                                                                   f'• Напишите /black_list для '
-                                                                   f'работы с черным списком\n'
-                                                                   f'• Напишите /back для '
-                                                                   f'возврашения стандартной клавиатуры',
-                                                          reply_markup=kb_admin))
-        elif message_text == '/log':
-            return asyncio.ensure_future(bot.send_file(user_id, f'{path}bot.log', 'log.txt'))
-        elif message_text == '/restart':
-            shuffle(restart_str_list)
-            kb_restart = []
-            for i in list(restart_str_list):
-                kb_restart.append([i])
-            RESTART_FLAG = 1
-            return asyncio.ensure_future(bot.send_message(user_id, 'Вы уверены?',
-                                                          reply_markup=tg_api.KeyboardBuilder(kb_restart)))
-        elif message_text == '/clear_log':
-            with open(path + 'bot.log', 'w'):  # log clearing
-                pass
-            logging.info('Cleared log')
-            return asyncio.ensure_future(bot.send_message(user_id, 'Лог был отчищен!', reply_markup=kb_admin))
-        elif message_text == '/black_list':
-            return asyncio.ensure_future(bot.send_message(user_id, 'Что сделать?', reply_markup=bl_keyboard))
-        elif message_text == '/back':
-            return asyncio.ensure_future(
-                bot.send_message(user_id, 'Возвращаю нормальную клавиатуру :)', reply_markup=kb_start2))
-    elif message_type == 'text':
+    elif text:
         if user_id in ADMIN_ID and message_text == 'Да, перезапуск!' and RESTART_FLAG:
             RESTART_FLAG = 0
             await bot.send_message(user_id, 'Перезапускаюсь...', reply_markup=kb_admin)
@@ -247,7 +251,8 @@ async def logic(bot):
             return asyncio.ensure_future(bot.send_message(user_id, 'Перезапуск отменен', reply_markup=kb_admin))
         else:
             return asyncio.ensure_future(bot.send_message(user_id, 'Помочь с командами?\nНапиши /help'))
-    elif message_type == 'reply_to_message':
+
+    elif reply_to_message:
         if one_mssg_rp and user_id in ADMIN_ID:
             if reply_text == bl_add_text:
                 asyncio.ensure_future(bot.delete_message(user_id, reply_message_id))
@@ -285,7 +290,8 @@ async def logic(bot):
                 return asyncio.ensure_future(bot.send_message(user_id, 'Помочь с командами?\nНапиши /help'))
         else:
             return asyncio.ensure_future(bot.send_message(user_id, 'Помочь с командами?\nНапиши /help'))
-    elif message_type == 'callback_query':
+
+    elif callback_query:
         if data[0] == '+':
             bt_pm25 = tg_api.InlineButtonBuilder('Частицы PM2.5', callback_data='=PM2.5' + data)
             bt_pm10 = tg_api.InlineButtonBuilder('Частицы PM10', callback_data='=PM10' + data)
@@ -324,6 +330,7 @@ async def logic(bot):
         elif data[0] == '=':
             data = data[1:].split('+')
             asyncio.ensure_future(bot.delete_message(user_id, message_id))
+
             if data[1] in ['15', '30', '60', '180']:  # minutes
                 plot_data = graph.read_csv_timedelta(data[0], datetime.now(),
                                                      datetime.now() - timedelta(minutes=int(data[1])))
@@ -341,6 +348,7 @@ async def logic(bot):
                 else:
                     return asyncio.ensure_future(bot.callback_answer(callback_id, text='За этот период нет данных :(',
                                                                      show_alert=True))
+
             elif data[1] == 'day':  # one day
                 date = data[2].split('-')
                 date = [int(i) for i in date]
@@ -362,6 +370,7 @@ async def logic(bot):
                 else:
                     return asyncio.ensure_future(bot.callback_answer(callback_id, text='За этот период нет данных :(',
                                                                      show_alert=True))
+
             elif data[1] == 'month':  # month
                 plot_data = graph.read_month(data[0])
                 photo = graph.plot_month(plot_data, data[0])
@@ -372,6 +381,7 @@ async def logic(bot):
                 else:
                     return asyncio.ensure_future(bot.callback_answer(callback_id, text='За этот период нет данных :(',
                                                                      show_alert=True))
+
         elif data[0] == '_':
             data = data[1:].split('+')
             asyncio.ensure_future(bot.callback_answer(callback_id))
