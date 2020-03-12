@@ -67,6 +67,10 @@ async def logic(bot):
 
     # parsing update
     text, command, admin_command, reply_to_message, callback_query = False, False, False, False, False
+    one_mssg_rp = False
+    message_text, reply_text, data = '', '', ''
+    reply_message_id, message_id = 0, 0
+    callback_id = ''
 
     if 'callback_query' in update.keys():
         callback_query = True
@@ -92,7 +96,6 @@ async def logic(bot):
             reply_message_id = int(received_message['reply_to_message']['message_id'])
             reply_text = received_message['reply_to_message']['text']
             message_id = int(received_message['message_id'])
-            one_mssg_rp = False
             if message_id-reply_message_id == 1:
                 one_mssg_rp = True
 
