@@ -483,7 +483,6 @@ if __name__ == '__main__':
                  filename=f'{path}proxy.dat',
                  site_to_test=f'https://api.telegram.org/bot{tkbot_token}/getMe')
 
-    asyncio.set_event_loop(asyncio.new_event_loop())
     ioloop = asyncio.get_event_loop()
     task_proxy = ioloop.create_task(find_proxy())
     try:
