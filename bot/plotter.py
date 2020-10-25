@@ -1,94 +1,33 @@
-import asyncio
-from aiohttp import ClientTimeout
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter, MinuteLocator, DayLocator
 from matplotlib.ticker import NullFormatter
-from bs4 import BeautifulSoup
 import csv
 import logging
 from datetime import datetime, timedelta, time, date
-from os import path, stat, remove, listdir
+from os import path, stat, listdir
 from io import BytesIO
-from restart import MeteoError
 
 
-class GRAPH:
-    def __init__(self, ip: str, data_path='/home/pi/bot/data/', timeout=15):
-        self.ip_add = 'http://' + ip + '/values'
+class Plotter:
+    def __init__(self, data_path='/'):
         self.data_path = data_path
-        self.timeout = ClientTimeout(total=timeout)
 
-    async def get_info(self, session, bad_requests=0):
-        try:
-            async with session.get(self.ip_add, timeout=self.timeout) as resp:
-                assert resp.status == 200
-                text = await resp.text()
-                data = self.html_parser(text)
-        except Exception as err:
-            logging.error(f"Getting info from meteo error: {type(err)}:{err}")
-            await asyncio.sleep(5)
-            if bad_requests >= 5:
-                logging.critical('Too many bad requests with meteo')
-                raise MeteoError
-            else:
-                bad_requests += 1
-                return await self.get_info(session, bad_requests=bad_requests)
-        else:
-            if data:
-                return self.csv_write(data)
-            else:
-                return None
-
-    @staticmethod
-    def html_parser(text):
-        soup = BeautifulSoup(text, 'html.parser')
-        soup = soup.find_all('td', class_='r')
-        data_to_write = []
-        for i in range(len(soup) - 2):  # we don't need two last parameters (wifi)
-            i = soup[i].get_text()
-            i = i.replace(u'\xa0', u' ')  # change space to SPACE (I'm just normalizing the string)
-            i = i.split()  # separate value from measurement units
-            temp = i.pop(0)
-            if temp == '-':
-                logging.warning("Received empty values")
-                return None
-            data_to_write.append(float(temp))
-        data_to_write[3] = round(data_to_write[3] * 100 / 133, 2)  # hPa to mm Hg
-        data_to_write.append(datetime.now().strftime('%H:%M:%S'))  # adds time value
-        return data_to_write
-
-    def csv_write(self, data_to_write):
-        file_path = self.csv_path()
-        with open(file_path, 'a', newline='') as csv_file:
-            writer = csv.writer(csv_file, delimiter=',')
-            writer.writerow(data_to_write)
-        logging.debug('Wrote info to the file')
-        return None
-
-    def csv_path(self, date_local=None, new_file=True, bad_tries=0):  # creates new file or show previous
+    def csv_path(self, date_local=None, tries=5):  # creates new file or show previous
         if date_local is None:
             date_local = datetime.now().strftime('%d-%m-%Y')
         file_path = self.data_path + date_local + '.csv'
         if (not path.exists(file_path)) or (stat(file_path).st_size == 0):  # check if we have a file
-            if new_file:
-                logging.debug(f'Create new file: {file_path}')
-                with open(file_path, "w", newline='') as csv_file:
-                    writer = csv.writer(csv_file, delimiter=',')
-                    writer.writerow(['PM2.5', 'PM10', 'Temp', 'Pres', 'Humidity', 'Time'])
-                self.delete_old()  # call deleter every time we write new file
+            if tries <= 0:
+                logging.error('Can NOT find the file')
+                raise FileNotFoundError("Can't find .csv file")
             else:
-                if bad_tries >= 5:
-                    logging.warning('Can NOT find the file, so will create a new one')
-                    return self.csv_path()
-                else:
-                    bad_tries += 1
-                    logging.debug("Didn't find anything, try previous date")
-                    return self.csv_path(date_local=self.previous_date(date_local), new_file=False, bad_tries=bad_tries)
+                tries -= 1
+                logging.debug("Didn't find anything, try previous date")
+                return self.csv_path(date_local=self.previous_date(date_local), tries=tries)
         return file_path
 
     def read_last(self):  # reads last data
-        date_local = datetime.now().strftime('%d-%m-%Y')
-        file_path = self.csv_path(date_local=date_local, new_file=False)  # the name of file we will read
+        file_path = self.csv_path()  # the name of file we will read
         logging.debug(f'Reading file: {file_path}')
         with open(file_path, 'r') as f:
             reader = csv.DictReader(f)  # read the file as csv table
@@ -103,11 +42,11 @@ class GRAPH:
             start, end = end, start
         date1 = start.date()
         date2 = end.date()
-        files_to_read = [date1.strftime('%d-%m-%Y')+'.csv']
+        files_to_read = [date1.strftime('%d-%m-%Y') + '.csv']
         one_day = timedelta(days=1)
-        while date1-date2 >= one_day:
+        while date1 - date2 >= one_day:
             date1 -= one_day
-            files_to_read.append(date1.strftime('%d-%m-%Y')+'.csv')
+            files_to_read.append(date1.strftime('%d-%m-%Y') + '.csv')
         all_files = listdir(self.data_path)
         for file in files_to_read:
             if file not in all_files:
@@ -121,7 +60,7 @@ class GRAPH:
                 read = list(csv.DictReader(f))  # read the file as csv table
             read.reverse()
             for temp in read:
-                temp_datetime = datetime.strptime(file[0:-4]+'-'+temp['Time'], '%d-%m-%Y-%H:%M:%S')
+                temp_datetime = datetime.strptime(file[0:-4] + '-' + temp['Time'], '%d-%m-%Y-%H:%M:%S')
                 if start >= temp_datetime >= end:
                     data_to_graph.append(float(temp[parameter]))
                     time_to_graph.append(temp_datetime)
@@ -292,9 +231,11 @@ class GRAPH:
         if not min_list or not max_list or not dates:
             logging.error("Can't plot month graph, no data!")
             return None
-        min_line, = plt.plot(dates, min_list, marker='.', color='blue', label='Минимум')
-        max_line, = plt.plot(dates, max_list, marker='.', color='orange', label='Максимум')
-        plt.xlim(left=dates[-1]+timedelta(days=1), right=dates[0]-timedelta(days=1))  # invert x axis
+        min_line, = plt.plot(dates, min_list, marker='.',
+                             color='blue', label='Минимум')
+        max_line, = plt.plot(dates, max_list, marker='.',
+                             color='orange', label='Максимум')
+        plt.xlim(left=dates[-1] + timedelta(days=1), right=dates[0] - timedelta(days=1))  # invert x axis
         plt.gcf().autofmt_xdate()
         ax = plt.gca()  # gca stands for 'get current axis'
         ax.xaxis.set_major_formatter(DateFormatter('%d.%m.%y'))
@@ -348,13 +289,20 @@ class GRAPH:
         date_local -= timedelta(days=1)
         return date_local.strftime('%d-%m-%Y')
 
-    def delete_old(self, days_to_save=30, files_num=1):  # deletes old files (calls every time new file creates)
-        old_file_date = datetime.now() - timedelta(days=days_to_save)
-        one_day_delta = timedelta(days=1)
-        for i in range(files_num):
-            file_path = self.data_path + old_file_date.strftime('%d-%m-%Y') + '.csv'
-            logging.debug(f'File that should be removed:{file_path}')
-            if path.exists(file_path):
-                remove(file_path)
-                logging.info(f'Removed old file: {file_path}')
-            old_file_date -= one_day_delta
+    @staticmethod
+    def time_to_str(time: str):
+        if time == '15':
+            return 'последние 15 минут'
+        elif time == '30':
+            return 'последние полчаса'
+        elif time == '60':
+            return 'последний час'
+        elif time == '180':
+            return 'последние 3 часа'
+        elif time == 'day':
+            return 'день'
+        elif time == 'month':
+            return 'месяц'
+        else:
+            logging.error(f'Wrong time: {time}')
+            return None

@@ -1,0 +1,6 @@
+attrs==19.1.0
+asyncio==3.4.3
+aiohttp==3.6.3
+proxybroker==0.3.2
+aiogram==2.10.1
+matplotlib==3.3.2

@@ -1,20 +1,17 @@
 import random
 import csv
 from datetime import datetime, timedelta
-from os import name, path
 
+DOCKER_VOLUME_PATH = '/meteo_data/'
+# DOCKER_VOLUME_PATH = 'C:\\Projects\\tg-bot\\'
 file_path = ''
 
 
 def new_file(date=None):
     global file_path
-    if name == 'nt':
-        prog_path = path.dirname(__file__) + '\\'
-    else:
-        prog_path = '/home/pi/bot/'
     if date is None:
         date = datetime.now().strftime('%d-%m-%Y')
-    file_path = prog_path + 'data/' + date + '.csv'
+    file_path = DOCKER_VOLUME_PATH + date + '.csv'
     with open(file_path, "w", newline='') as csv_file:
         writer = csv.writer(csv_file, delimiter=',')
         writer.writerow(['PM2.5', 'PM10', 'Temp', 'Pres', 'Humidity', 'Time'])

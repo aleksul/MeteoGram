@@ -1,0 +1,29 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"editor.renderWhitespace": "selection",
+    	"editor.cursorBlinking": "phase",
+    	"html.format.wrapLineLength": 80,
+    	"python.linting.pylintEnabled": true,
+		"python.linting.enabled": true,
+		"python.languageServer": "Microsoft",
+		"python.formatting.provider": "black",
+		"python.autoComplete.extraPaths": ["./bot", "./data_collector"]
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Python: Текущий файл",
+				"type": "python",
+				"request": "launch",
+				"program": "${file}",
+				"console": "integratedTerminal"
+			}
+		]
+	}
+}

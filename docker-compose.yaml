@@ -1,0 +1,32 @@
+version: "3"
+
+volumes:
+  meteo_data:
+
+services:
+  bot:
+    build:
+      context: ./bot/
+      dockerfile: Dockerfile
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 15s
+    volumes:
+        - meteo_data:/meteo_data
+  meteo-collector:
+    build:
+      context: ./data_collector/
+      dockerfile: Dockerfile
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+        delay: 20s
+        max_attempts: 10
+        window: 30s
+    volumes:
+        - meteo_data:/meteo_data

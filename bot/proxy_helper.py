@@ -1,29 +1,29 @@
 import asyncio
 import aiohttp
 from concurrent import futures
-from time import clock
+from time import perf_counter
 from os import path, stat, remove
 from proxybroker import Broker
 import logging
 
 
-class Proxy:
-    def __init__(self, timeout=3, filename='/home/pi/bot/proxy.txt', site_to_test='http://example.org/'):
+class ProxyGrabber:
+    def __init__(self, timeout=3, filename='proxy.txt', site_to_test='http://example.org/'):
         self.site_to_test = site_to_test
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self.filename = filename
 
-    async def internet_check(self, site: str):
-        try:
-            async with aiohttp.request('GET',
-                                       site, timeout=self.timeout) as resp:
-                assert resp.status == 200
-                logging.debug(f"Internet seems to be connected. Response from {site}: {resp.status}")
-        except Exception as err:
-            logging.warning(f"Site {site} does not work: {type(err)}:{err}")
-            return {'site': site, 'result': False}
+    async def grab(self) -> str:
+        result = await self.loader()
+        if result is not None:
+            return f"http://{result}"
         else:
-            return {'site': site, 'result': True}
+            result, _ = asyncio.wait([self.broker_find(), self.pub_find()], timeout=30,  return_when="FIRST_COMPLETED")
+            result = [i.result() for i in result if i.result() is not None]
+            if result:
+                return f"http://{result[-1]}"
+            else:
+                raise OSError("No proxy found")
 
     async def broker_find(self):
         proxies_num = 10
@@ -32,7 +32,7 @@ class Proxy:
             broker = Broker(queue=proxies)
             await broker.find(types=['HTTPS'], limit=proxies_num)  # finds 10(==proxies_num) https proxies
             proxy_temp = []
-            for i in range(proxies_num):
+            for _ in range(proxies_num):
                 proxy_temp.append(await proxies.get())  # write proxies to the list as soon as possible
         except Exception as err:  # something might go wrong
             logging.error(f"Can't find a proxy with proxy broker: {type(err)}: {err}")
@@ -61,7 +61,7 @@ class Proxy:
     async def check(self, proxy: str, session: aiohttp.ClientSession):  # simply tests access to the site via proxy
         site = self.site_to_test
         proxy = "http://" + proxy
-        ping = clock()
+        ping = perf_counter()
         try:
             async with session.get(site, proxy=proxy, timeout=self.timeout) as resp:
                 assert resp.status == 200
@@ -75,7 +75,7 @@ class Proxy:
             logging.debug(f"This proxy ({proxy}) doesn't work, exception: {type(err)}:{err}")
             return None
         else:
-            ping = clock() - ping
+            ping = perf_counter() - ping
             logging.debug(f"This one seems to be good! Proxy: {proxy} Ping: {ping}")
             proxy = {"proxy": proxy, "ping": ping}
             return proxy
@@ -102,10 +102,10 @@ class Proxy:
 
     async def loader(self):  # almost same as saver, but it doesn't append file with new proxies
         if not path.exists(self.filename):  # Firstly, check if we have a file
-            logging.warning("We don't have a file!")
+            logging.warning("We don't have a proxy file!")
             return None
         elif stat(self.filename).st_size == 0:  # Secondly, if it is not empty
-            logging.warning("The file is empty!")
+            logging.warning("The proxy file is empty!")
             return None
         with open(self.filename, "r") as f:  # Read the file and close it
             read_proxies = f.readlines()
@@ -130,3 +130,16 @@ class Proxy:
             logging.warning('No working proxy in the file!')
             remove(self.filename)
             return None
+
+
+async def check_site(site: str, timeout=aiohttp.ClientTimeout(total=5)) -> bool:
+        try:
+            async with aiohttp.request('GET',
+                                       site, timeout=timeout) as resp:
+                assert resp.status == 200
+                logging.debug(f"Internet seems to be connected. Response from {site}: {resp.status}")
+        except Exception as err:
+            logging.warning(f"Site {site} does not work: {type(err)}:{err}")
+            return False
+        else:
+            return True
