@@ -7,7 +7,6 @@ import logging
 from os import name, stat, environ
 from random import shuffle
 from datetime import datetime, timedelta
-from io import IOBase
 
 # path = "C:\\Projects\\tg-bot\\bot\\"  # DEBUG
 path = '/code/'
@@ -61,7 +60,7 @@ if isProxyNeeded:
     PROXY = loop.run_until_complete(proxyFinder.grab())
 
 # graphics = Plotter(data_path='C:\\Projects\\tg-bot\\bot\\data\\')  # DEBUG
-graphics = Plotter(data_path='/meteo_data')
+graphics = Plotter(data_path='/meteo_data/')
 
 
 if isProxyNeeded:
@@ -78,6 +77,7 @@ async def send_welcome(message: aiogram.types.Message):
                                          f'узнать метеоданные в Троицке!', 
                                          reply_markup=KB_START))
 
+
 @dp.message_handler(commands=['help'])
 async def send_help(message: aiogram.types.Message):
     asyncio.ensure_future(message.answer('Все чрезвычайно просто:\n'
@@ -87,6 +87,7 @@ async def send_help(message: aiogram.types.Message):
                                          'Интересуют подробности отображаемых измерений?\n'
                                          'Напиши /info',
                                          reply_markup=KB_START2))
+
 
 @dp.message_handler(commands=["info"])
 async def send_info(message: aiogram.types.Message):
@@ -113,10 +114,47 @@ async def send_info(message: aiogram.types.Message):
                                          'https://habr.com/ru/company/tion/blog/396111/',
                                          reply_markup=KB_START2))
 
+
+@dp.message_handler(commands=['now'])
+async def send_now(message: aiogram.types.Message):
+    now = graphics.read_last()
+    asyncio.ensure_future(message.answer(f'Данные собраны в {now["Time"]}\n\n'
+                                         f'Температура: {now["Temp"]} °C\n'
+                                         f'Давление: {now["Pres"]} мм/рт.ст.\n'
+                                         f'Влажность: {now["Humidity"]} %\n'
+                                         f'Частицы PM2.5: {now["PM2.5"]} мкгр/м³\n'
+                                         f'Частицы PM10: {now["PM10"]} мкгр/м³'))
+
+
+@dp.message_handler(commands=['raw'])
+async def send_raw_kb(message: aiogram.types.Message):
+    KB_DATES = aiogram.types.InlineKeyboardMarkup()
+    dates = graphics.dates()
+    for date in dates:
+        pretty_date = date.replace('-', '.')
+        BT_temp = aiogram.types.InlineKeyboardButton(pretty_date, callback_data='+raw+' + date)
+        KB_DATES.add(BT_temp)
+    today = datetime.now()
+    BT_temp = aiogram.types.InlineKeyboardButton(today.strftime('%d.%m.%Y'), callback_data='+raw+' + today.strftime('%d-%m-%Y'))
+    KB_DATES.add(BT_temp)
+    asyncio.ensure_future(message.answer(text='Выберите дату:', reply_markup=KB_DATES))
+
+
+@dp.callback_query_handler(lambda c: (c.data and c.data.startswith("+raw")))
+async def send_raw_file(callback_query: aiogram.types.CallbackQuery):
+    await BOT.send_chat_action(callback_query.message.chat.id, aiogram.types.ChatActions.UPLOAD_DOCUMENT)
+    date = callback_query.data[5::]
+    file_path = graphics.data_path + date + '.csv'
+    with open(file_path, 'rb') as f:
+        doc = aiogram.types.InputFile(f, filename = date + '.csv')
+        await callback_query.message.answer_document(doc)
+
+
 @dp.message_handler(commands=["graph"])
 async def send_graph_kb(message: aiogram.types.Message):
     asyncio.ensure_future(message.answer('Выберите временной промежуток:',
                                          reply_markup=KB_CHOOSE_TIME))
+
 
 @dp.callback_query_handler(lambda c: (c.data and c.data.startswith("+month") and c.data.rfind("=") != -1))
 async def plot_graph_month(callback_query: aiogram.types.CallbackQuery):
@@ -129,9 +167,10 @@ async def plot_graph_month(callback_query: aiogram.types.CallbackQuery):
                                                                     caption=f'{param_str} за последний месяц'))
         asyncio.ensure_future(callback_query.answer())
     else:
-        asyncio.ensure_future(callback_query.answer(text='За этот период нет данных :pensive:',
+        asyncio.ensure_future(callback_query.answer(text='За этот период нет данных 😔',
                                                     show_alert=True))
-    
+
+
 @dp.callback_query_handler(lambda c: (c.data and c.data.startswith("+day") and c.data.rfind("=") != -1))
 async def plot_graph_day(callback_query: aiogram.types.CallbackQuery):  # TODO: period of time chooser
     code = callback_query.data[1::].split("=")
@@ -152,11 +191,12 @@ async def plot_graph_day(callback_query: aiogram.types.CallbackQuery):  # TODO: 
                                     )
             asyncio.ensure_future(callback_query.answer())
         else:
-            asyncio.ensure_future(callback_query.answer(text='За этот период нет данных :pensive:',
+            asyncio.ensure_future(callback_query.answer(text='За этот период нет данных 😔',
                                                         show_alert=True))
     else:
-        asyncio.ensure_future(callback_query.answer(text='За этот период нет данных :pensive:',
+        asyncio.ensure_future(callback_query.answer(text='За этот период нет данных 😔',
                                                     show_alert=True))
+
 
 @dp.callback_query_handler(lambda c: (c.data and c.data.startswith("+") and c.data.rfind("=") != -1 and not c.data.startswith("+month") and not c.data.startswith("+day")))
 async def plot_graph_minutes(callback_query: aiogram.types.CallbackQuery):
@@ -173,16 +213,17 @@ async def plot_graph_minutes(callback_query: aiogram.types.CallbackQuery):
                                                                                 f'{graphics.time_to_str(code)}'))
             asyncio.ensure_future(callback_query.answer())
         else:
-            asyncio.ensure_future(callback_query.answer(text='За этот период нет данных :pensive:',
+            asyncio.ensure_future(callback_query.answer(text='За этот период нет данных 😔',
                                                         show_alert=True))
     else:
-        asyncio.ensure_future(callback_query.answer(text='За этот период нет данных :pensive:',
+        asyncio.ensure_future(callback_query.answer(text='За этот период нет данных 😔',
                                                     show_alert=True))
 
-@dp.callback_query_handler(lambda c: (c.data and c.data.startswith("+") and c.data != "+day"))
+
+@dp.callback_query_handler(lambda c: (c.data and (c.data[0:2] in ['+15', '+30', '+60'] or c.data.startswith('+180')) and c.data != "+day"))
 async def add_parameter(callback_query: aiogram.types.CallbackQuery):
     if callback_query.data == "+month" and not graphics.dates():
-        asyncio.ensure_future(callback_query.answer(text='За этот период нет данных :pensive:',
+        asyncio.ensure_future(callback_query.answer(text='За этот период нет данных 😔',
                                                     show_alert=True))
         return
     bt_pm25      = aiogram.types.InlineKeyboardButton('Частицы PM2.5', callback_data=callback_query.data+'=PM2.5')
@@ -196,6 +237,7 @@ async def add_parameter(callback_query: aiogram.types.CallbackQuery):
     KB_PARAMETER.row(bt_pres, bt_humidity)
     asyncio.ensure_future(callback_query.message.edit_text(text='Выберите параметр:', reply_markup=KB_PARAMETER))
 
+
 @dp.callback_query_handler(lambda c: (c.data and c.data == '+day'))
 async def select_day(callback_query: aiogram.types.CallbackQuery):
     KB_DATES = aiogram.types.InlineKeyboardMarkup()
@@ -207,7 +249,7 @@ async def select_day(callback_query: aiogram.types.CallbackQuery):
             KB_DATES.add(BT_temp)
         asyncio.ensure_future(callback_query.message.edit_text(text='Выберите дату:', reply_markup=KB_DATES))
     else:
-        asyncio.ensure_future(callback_query.answer(text='За этот период нет данных :pensive:',
+        asyncio.ensure_future(callback_query.answer(text='За этот период нет данных 😔',
                                                     show_alert=True))
 
 
@@ -223,17 +265,16 @@ async def admin_commands(message: aiogram.types.Message):
                                              reply_markup=KB_ADMIN))
     elif message.get_command() == "/log":
         await BOT.send_chat_action(message.chat.id, aiogram.types.ChatActions.UPLOAD_DOCUMENT)
-        f = open(f'{path}bot.log', 'rb')
-        doc = aiogram.types.InputFile(f, filename='log.txt')
-        await message.answer_document(doc)
-        f.close()
+        with open(f'{path}bot.log', 'rb') as f:
+            doc = aiogram.types.InputFile(f, filename='log.txt')
+            await message.answer_document(doc)
     elif message.get_command() == "/clear_log":
         with open(path + 'bot.log', 'w'):  # log clearing
             pass
         logging.info('Cleared log')
         asyncio.ensure_future(message.answer('Лог был отчищен!'))
     elif message.get_command() == "/back":
-        asyncio.ensure_future(message.answer('Возвращаю нормальную клавиатуру :wink:', reply_markup=KB_START2))
+        asyncio.ensure_future(message.answer('Возвращаю нормальную клавиатуру 😉', reply_markup=KB_START2))
 
 if __name__ == '__main__':
     aiogram.executor.start_polling(dp, skip_updates=True)
