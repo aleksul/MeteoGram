@@ -140,7 +140,7 @@ async def send_raw_kb(message: aiogram.types.Message):
     asyncio.ensure_future(message.answer(text='Выберите дату:', reply_markup=KB_DATES))
 
 
-@dp.callback_query_handler(lambda c: (c.data and c.data.startswith("+raw")))
+@dp.callback_query_handler(lambda c: (c.data and c.data.startswith("+raw")))  # TODO rewrite callbacks data
 async def send_raw_file(callback_query: aiogram.types.CallbackQuery):
     await BOT.send_chat_action(callback_query.message.chat.id, aiogram.types.ChatActions.UPLOAD_DOCUMENT)
     date = callback_query.data[5::]
@@ -156,7 +156,7 @@ async def send_graph_kb(message: aiogram.types.Message):
                                          reply_markup=KB_CHOOSE_TIME))
 
 
-@dp.callback_query_handler(lambda c: (c.data and c.data.startswith("+month") and c.data.rfind("=") != -1))
+@dp.callback_query_handler(lambda c: (c.data and c.data.startswith("+month") and c.data.find("=") != -1))
 async def plot_graph_month(callback_query: aiogram.types.CallbackQuery):
     code = callback_query.data[1::].split("=")
     parameter, code = code[1], code[0]
@@ -171,7 +171,7 @@ async def plot_graph_month(callback_query: aiogram.types.CallbackQuery):
                                                     show_alert=True))
 
 
-@dp.callback_query_handler(lambda c: (c.data and c.data.startswith("+day") and c.data.rfind("=") != -1))
+@dp.callback_query_handler(lambda c: (c.data and c.data.startswith("+day") and c.data.find("=") != -1))
 async def plot_graph_day(callback_query: aiogram.types.CallbackQuery):  # TODO: period of time chooser
     code = callback_query.data[1::].split("=")
     parameter, code = code[1], code[0]
@@ -198,7 +198,7 @@ async def plot_graph_day(callback_query: aiogram.types.CallbackQuery):  # TODO: 
                                                     show_alert=True))
 
 
-@dp.callback_query_handler(lambda c: (c.data and c.data.startswith("+") and c.data.rfind("=") != -1 and not c.data.startswith("+month") and not c.data.startswith("+day")))
+@dp.callback_query_handler(lambda c: (c.data and (c.data[0:3] in ['+15', '+30', '+60'] or c.data.startswith('+180')) and c.data.find("=") != -1))
 async def plot_graph_minutes(callback_query: aiogram.types.CallbackQuery):
     code = callback_query.data[1::].split("=")
     parameter, code = code[1], code[0]
@@ -220,7 +220,7 @@ async def plot_graph_minutes(callback_query: aiogram.types.CallbackQuery):
                                                     show_alert=True))
 
 
-@dp.callback_query_handler(lambda c: (c.data and (c.data[0:2] in ['+15', '+30', '+60'] or c.data.startswith('+180')) and c.data != "+day"))
+@dp.callback_query_handler(lambda c: (c.data and c.data.startswith("+") and c.data != '+day' and c.data.find("=") == -1))
 async def add_parameter(callback_query: aiogram.types.CallbackQuery):
     if callback_query.data == "+month" and not graphics.dates():
         asyncio.ensure_future(callback_query.answer(text='За этот период нет данных 😔',

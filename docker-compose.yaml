@@ -1,10 +1,11 @@
-version: "3"
+version: "3.8"
 
 volumes:
   meteo_data:
 
 services:
   bot:
+    image: aleksul/meteo-bot
     build:
       context: ./bot/
       dockerfile: Dockerfile
@@ -15,9 +16,17 @@ services:
         delay: 10s
         max_attempts: 5
         window: 15s
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 60M
+        reservations:
+          cpus: '0.25'
+          memory: 25M
     volumes:
         - meteo_data:/meteo_data
   meteo-collector:
+    image: aleksul/meteo-collector
     build:
       context: ./data_collector/
       dockerfile: Dockerfile
@@ -28,5 +37,9 @@ services:
         delay: 20s
         max_attempts: 10
         window: 30s
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 30M
     volumes:
         - meteo_data:/meteo_data

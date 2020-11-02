@@ -19,8 +19,7 @@ class MeteostationDataSaver:
         try:
             response = requests.get(self.ip_add, timeout=self.timeout)
             assert response.status_code == 200
-            text = response.text()
-            data = self.html_parser(text)
+            data = self.html_parser(response.text)
         except Exception as err:
             logging.error(f"Getting info from meteostation error: {type(err)}:{err}")
         else:
@@ -107,7 +106,7 @@ if __name__ == "__main__":
         while True:
             pass
     else:
-        dataSaver = MeteostationDataSaver(environ.get("MeteostationIP", "192.168.0.2"), "/meteo_data")
+        dataSaver = MeteostationDataSaver(environ.get("MeteostationIP", "192.168.0.2"), "/meteo_data/")
         schedule.every(60).seconds.do(dataSaver.get_info)
         while True:
             schedule.run_pending()
