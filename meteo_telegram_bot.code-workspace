@@ -10,6 +10,7 @@
     	"html.format.wrapLineLength": 80,
     	"python.linting.pylintEnabled": true,
 		"python.linting.enabled": true,
+    	"python.analysis.memory.keepLibraryAst": true,
 		"python.languageServer": "Microsoft",
 		"python.formatting.provider": "black",
 		"python.autoComplete.extraPaths": ["./bot", "./data_collector"]

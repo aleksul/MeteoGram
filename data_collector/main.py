@@ -44,7 +44,7 @@ class MeteostationDataSaver:
         data_to_write.append(datetime.now().strftime('%H:%M:%S'))  # adds time value
         return data_to_write
 
-    def csv_write(self, data_to_write):
+    def csv_write(self, data_to_write):  # TODO: rewrite to sqlite + pewee
         file_path = self.csv_path()
         with open(file_path, 'a', newline='') as csv_file:
             writer = csv.writer(csv_file, delimiter=',')

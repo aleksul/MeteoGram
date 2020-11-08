@@ -3,7 +3,7 @@ import csv
 from datetime import datetime, timedelta
 
 DOCKER_VOLUME_PATH = '/meteo_data/'
-# DOCKER_VOLUME_PATH = 'C:\\Projects\\tg-bot\\'
+# DOCKER_VOLUME_PATH = 'C:\\Projects\\tg-bot\\bot\\data\\'
 file_path = ''
 
 

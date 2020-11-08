@@ -7,7 +7,8 @@ from datetime import datetime, timedelta, time, date
 from os import path, stat, listdir
 from io import BytesIO
 
-
+# TODO: devide in 2 classes - one for getting info, one for plotting
+# TODO: rewrite for tortoise + aiosqlite
 class Plotter:
     def __init__(self, data_path='/'):
         self.data_path = data_path
@@ -209,19 +210,11 @@ class Plotter:
 
     @staticmethod
     def parameter_to_str(parameter: str):
-        if parameter == 'PM2.5':
-            return 'Частицы PM2.5'
-        elif parameter == 'PM10':
-            return 'Частицы PM10'
-        elif parameter == 'Temp':
-            return 'Температура'
-        elif parameter == 'Pres':
-            return 'Давление'
-        elif parameter == 'Humidity':
-            return 'Влажность'
-        else:
-            logging.error('Parameter is wrong!')
-            return None
+        parameter_dict = {'PM2.5': 'Частицы PM2.5', 'PM10': 'Частицы PM10', 'Temp': 'Температура', 'Pres': 'Давление', 'Humidity': 'Влажность'}
+        result = parameter_dict.get(parameter)
+        if result is None:
+            logging.error('Can not convert parameter to string!')
+        return result
 
     @staticmethod
     def plot_month(data: dict, parameter: str):  # plots month graph with min and max values of a day
@@ -291,18 +284,8 @@ class Plotter:
 
     @staticmethod
     def time_to_str(time: str):
-        if time == '15':
-            return 'последние 15 минут'
-        elif time == '30':
-            return 'последние полчаса'
-        elif time == '60':
-            return 'последний час'
-        elif time == '180':
-            return 'последние 3 часа'
-        elif time == 'day':
-            return 'день'
-        elif time == 'month':
-            return 'месяц'
-        else:
+        time_dict = {'015': '15 минут', '030': 'полчаса', '060': '1 час', '180': '3 часа', 'day': 'день', 'mon': 'месяц'}
+        result = time_dict.get(time)
+        if result is None:
             logging.error(f'Wrong time: {time}')
-            return None
+        return result
