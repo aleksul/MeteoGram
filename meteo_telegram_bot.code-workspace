@@ -11,9 +11,16 @@
     	"python.linting.pylintEnabled": true,
 		"python.linting.enabled": true,
     	"python.analysis.memory.keepLibraryAst": true,
-		"python.languageServer": "Microsoft",
+		"python.languageServer": "Pylance",
 		"python.formatting.provider": "black",
-		"python.autoComplete.extraPaths": ["./bot", "./data_collector"]
+		"python.autoComplete.extraPaths": [
+			"./bot",
+			"./data_collector"
+		],
+		"python.analysis.extraPaths": [
+			"./bot",
+			"./data_collector"
+		]
 	},
 	"launch": {
 		"version": "0.2.0",

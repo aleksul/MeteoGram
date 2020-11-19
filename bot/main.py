@@ -1,11 +1,11 @@
 #!/usr/bin/python3.8
 import asyncio
+import tempfile
 import aiogram
 import proxy_helper
-from plotter import Plotter
+from plotter import Plotter, DatabaseHandler
 import logging
-from os import name, stat, environ, path
-from random import shuffle
+from os import environ, path, remove
 from datetime import datetime, timedelta
 
 DIRECTORY = '/code/'
@@ -36,8 +36,6 @@ bt_15min = aiogram.types.InlineKeyboardButton('15 минут', callback_data='01
 KB_CHOOSE_TIME = aiogram.types.InlineKeyboardMarkup()
 KB_CHOOSE_TIME.add(bt_15min, bt_30min, bt_1h, bt_3h, bt_day); KB_CHOOSE_TIME.row(bt_month)
 
-graphics = Plotter(data_path='/meteo_data/')
-# graphics = Plotter(data_path='C:\\Projects\\tg-bot\\bot\\data\\')  # DEBUG
 
 async def doWeNeedProxy() -> bool:
      # internet connection test
@@ -54,16 +52,20 @@ async def doWeNeedProxy() -> bool:
         return False
 
 
-if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    if loop.run_until_complete(doWeNeedProxy()):
-        proxyFinder = proxy_helper.ProxyGrabber(timeout=3,
-                                                filename=f'{DIRECTORY}proxy.dat',
-                                                site_to_test=f'https://api.telegram.org/bot{BOT_TOKEN}/getMe')
-        BOT = aiogram.Bot(token=BOT_TOKEN, proxy=loop.run_until_complete(proxyFinder.grab()))
-    else:
-        BOT = aiogram.Bot(token=BOT_TOKEN)
-    dp = aiogram.Dispatcher(BOT)
+BOT: aiogram.Bot
+db = DatabaseHandler(db_path = 'sqlite:///meteo_data/data.db')
+# db = DatabaseHandler(db_path = 'sqlite://test_data.db')  # DEBUG
+graphics = Plotter()
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+if loop.run_until_complete(doWeNeedProxy()):
+    proxyFinder = proxy_helper.ProxyGrabber(timeout=3,
+                                            filename=f'{DIRECTORY}proxy.dat',
+                                            site_to_test=f'https://api.telegram.org/bot{BOT_TOKEN}/getMe')
+    BOT = aiogram.Bot(token=BOT_TOKEN, proxy=loop.run_until_complete(proxyFinder.grab()))
+else:
+    BOT = aiogram.Bot(token=BOT_TOKEN)
+dp = aiogram.Dispatcher(BOT)
 
 
 @dp.message_handler(commands=['start'])
@@ -113,29 +115,24 @@ async def send_info(message: aiogram.types.Message):
 
 @dp.message_handler(commands=['now'])
 async def send_now(message: aiogram.types.Message):
-    now = graphics.read_last()
-    asyncio.ensure_future(message.answer(f'Данные собраны в {now["Time"]}\n\n'
-                                         f'Температура: {now["Temp"]} °C\n'
-                                         f'Давление: {now["Pres"]} мм/рт.ст.\n'
-                                         f'Влажность: {now["Humidity"]} %\n'
-                                         f'Частицы PM2.5: {now["PM2.5"]} мкгр/м³\n'
-                                         f'Частицы PM10: {now["PM10"]} мкгр/м³'))
+    now = await db.getLastData()
+    asyncio.ensure_future(message.answer(f'Данные собраны в {now["time"].strftime("%H:%M:%S")}\n\n'
+                                         f'Температура: {now["temperature"]} °C\n'
+                                         f'Давление: {now["pressure"]} мм/рт.ст.\n'
+                                         f'Влажность: {now["humidity"]} %\n'
+                                         f'Частицы PM2.5: {now["pm25"]} мкгр/м³\n'
+                                         f'Частицы PM10: {now["pm10"]} мкгр/м³'))
 
 
 @dp.message_handler(commands=['raw'])
 async def send_raw_kb(message: aiogram.types.Message):
-    # sends message with all dates
-
-    # creating a keyboard with all dates
     KB_DATES = aiogram.types.InlineKeyboardMarkup(row_width=3)
-    for date in graphics.dates():
-        pretty_date = date.replace('-', '.')
-        BT_temp = aiogram.types.InlineKeyboardButton(pretty_date, callback_data='=raw+' + date)
+    dates = await db.getAllDates(includeToday=True)
+    if len(dates) > 30:
+        dates = dates[0:30]
+    for _date in dates:
+        BT_temp = aiogram.types.InlineKeyboardButton(_date.strftime('%d.%m.%Y'), callback_data='=raw+' + _date.strftime('%d-%m-%Y'))
         KB_DATES.insert(BT_temp)
-    # adding today to this keyboard
-    today = datetime.now()
-    BT_temp = aiogram.types.InlineKeyboardButton(today.strftime('%d.%m.%Y'), callback_data='=raw+' + today.strftime('%d-%m-%Y'))
-    KB_DATES.insert(BT_temp)
     # sending message
     await message.answer('> Просмотр исходного файла\n'
                          'Выберите дату:', 
@@ -145,13 +142,15 @@ async def send_raw_kb(message: aiogram.types.Message):
 @dp.callback_query_handler(lambda c: (c.data and c.data.startswith("=raw")))
 async def send_raw_file(callback_query: aiogram.types.CallbackQuery):
     await BOT.send_chat_action(callback_query.message.chat.id, aiogram.types.ChatActions.UPLOAD_DOCUMENT)
-    date = callback_query.data.split("+")[1]
-    file_path = graphics.data_path + date + '.csv'
-    if path.exists(file_path):
-        with open(file_path, 'rb') as f:
-            doc = aiogram.types.InputFile(f, filename = date + '.csv')
-            await callback_query.message.answer_document(doc)
-            await callback_query.answer()
+    strDate = callback_query.data.split("+")[1]
+    _date = datetime.strptime(strDate, '%d-%m-%Y').date()
+    fi = await db.getRawDataByDay(_date)
+    with open(fi.name, 'rb') as f:
+        doc = aiogram.types.InputFile(f, filename = strDate + '.csv')
+        await callback_query.message.answer_document(doc)
+    remove(fi.name)
+    await callback_query.answer()
+        
 
 
 @dp.message_handler(commands=["graph"])
@@ -165,86 +164,99 @@ async def send_graph_kb(message: aiogram.types.Message):
 async def plot_graph_month(callback_query: aiogram.types.CallbackQuery):
     code = callback_query.data[1::].split("+")
     code, parameter = code[0], code[1]
-    photo = graphics.plot_month(graphics.read_month(parameter), parameter)
-    if photo:
-        param_str = graphics.parameter_to_str(parameter).capitalize()
-        await callback_query.answer()
-        await BOT.send_chat_action(callback_query.message.chat.id, aiogram.types.ChatActions.UPLOAD_PHOTO)
-        await callback_query.message.answer_photo(photo, 
-                                                  caption=f'{param_str} за последний месяц')
-    else:
+    photo: bytes
+    try:
+        photo = graphics.plot_month(await db.getMonthData(parameter), parameter)
+    except Exception as e:
+        logging.warning(f'Catched error while tring to plot month graph: {type(e)}: {e}')
         await callback_query.answer(text='За этот период нет данных 😔',
                                     show_alert=True)
+    else:
+        await callback_query.answer()
+        await BOT.send_chat_action(
+            callback_query.message.chat.id, 
+            aiogram.types.ChatActions.UPLOAD_PHOTO
+            )
+        await callback_query.message.answer_photo(
+            photo, 
+            caption=f'{graphics.valueToStr(parameter)} за последний месяц'
+            )
 
 
 @dp.callback_query_handler(lambda c: (c.data and c.data.startswith("=day")))
 async def plot_graph_day(callback_query: aiogram.types.CallbackQuery):  # TODO: period of time chooser
     code = callback_query.data[1::].split("+")
-    code, date, parameter = code[0], code[1], code[2]
-    date = [int(i) for i in date.split("-")]
-    plot_data = graphics.read_csv_timedelta(parameter, 
-                                            datetime(date[2], date[1], date[0], 0, 0, 0), 
-                                            datetime(date[2], date[1], date[0], 23, 59, 59))
-    if plot_data:
-        photo = graphics.plot_day(plot_data, parameter)
-        if photo:
-            param_str = graphics.parameter_to_str(parameter).capitalize()
-            await callback_query.answer()
-            await BOT.send_chat_action(callback_query.message.chat.id, aiogram.types.ChatActions.UPLOAD_PHOTO)
-            await callback_query.message.answer_photo(photo,
-                                                      caption=f'{param_str} за: '
-                                                              f'{date[0]}.{date[1]}.{date[2]}')
-        else:
-            await callback_query.answer(text='За этот период нет данных 😔',
-                                        show_alert=True)
-    else:
+    code, _date, parameter = code[0], code[1], code[2]
+    _date = datetime.strptime(_date, '%d-%m-%Y').date()
+    try:
+        photo = graphics.plot_day(await db.getDataByDay(_date, parameter), parameter)
+    except Exception as e:
+        logging.warning(f'Catched error while tring to plot day graph: {type(e)}: {e}')
         await callback_query.answer(text='За этот период нет данных 😔',
-                                        show_alert=True)
+                                    show_alert=True)
+    else:
+        await callback_query.answer()
+        await BOT.send_chat_action(
+            callback_query.message.chat.id, 
+            aiogram.types.ChatActions.UPLOAD_PHOTO
+            )
+        await callback_query.message.answer_photo(
+            photo, 
+            caption=f'{graphics.valueToStr(parameter)} за ' 
+                    f'{_date.strftime("%d.%m.%Y")}'
+            )
 
 
 @dp.callback_query_handler(lambda c: (c.data and c.data[0:4] in ['=015', '=030', '=060', '=180']))
 async def plot_graph_minutes(callback_query: aiogram.types.CallbackQuery):
     code = callback_query.data[1::].split("+")
     parameter, code = code[1], code[0]
-    plot_data = graphics.read_csv_timedelta(parameter, datetime.now(),
-                                            datetime.now() - timedelta(minutes=int(code)))
-    if plot_data:
-        photo = graphics.plot_minutes(plot_data, parameter)
-        if photo:
-            param_str = graphics.parameter_to_str(parameter).capitalize()
-            await callback_query.answer()
-            await BOT.send_chat_action(callback_query.message.chat.id, aiogram.types.ChatActions.UPLOAD_PHOTO)
-            await callback_query.message.answer_photo(photo,
-                                                      caption=f'{param_str} за '
-                                                              f'{graphics.time_to_str(code)}')
-        else:
-            await callback_query.answer(text='За этот период нет данных 😔',
-                                        show_alert=True)
-    else:
+    try:
+        photo = graphics.plot_minutes(
+            await db.getDataByTimedelta(
+                datetime.now(),
+                timedelta(minutes=-1*int(code)),
+                parameter
+                ),
+            parameter
+            )
+    except Exception as e:
+        logging.warning(f'Catched error while tring to plot minutes graph: {type(e)}: {e}')
         await callback_query.answer(text='За этот период нет данных 😔',
-                                        show_alert=True)
+                                    show_alert=True)
+    else:
+        await callback_query.answer()
+        await BOT.send_chat_action(
+            callback_query.message.chat.id, 
+            aiogram.types.ChatActions.UPLOAD_PHOTO
+            )
+        await callback_query.message.answer_photo(
+            photo,
+            caption=f'{graphics.valueToStr(parameter)} за '
+                    f'{graphics.timeToStr(code)}'
+            )
 
 
 @dp.callback_query_handler(lambda c: (c.data and (c.data in ['015', '030', '060', '180', 'mon'] or c.data.startswith('day+'))))
 async def add_parameter(callback_query: aiogram.types.CallbackQuery):
-    if callback_query.data == "mon" and not graphics.dates():
+    if callback_query.data == "mon" and not await db.getAllDates():
         await callback_query.answer(text='За этот период нет данных 😔',
                                     show_alert=True)
         return
-    bt_pm25      = aiogram.types.InlineKeyboardButton('Частицы PM2.5', callback_data='='+callback_query.data+'+PM2.5')
-    bt_pm10      = aiogram.types.InlineKeyboardButton('Частицы PM10',  callback_data='='+callback_query.data+'+PM10')
-    bt_temp      = aiogram.types.InlineKeyboardButton('Температура',   callback_data='='+callback_query.data+'+Temp')
-    bt_pres      = aiogram.types.InlineKeyboardButton('Давление',      callback_data='='+callback_query.data+'+Pres')
-    bt_humidity  = aiogram.types.InlineKeyboardButton('Влажность',     callback_data='='+callback_query.data+'+Humidity')
+    bt_pm25      = aiogram.types.InlineKeyboardButton('Частицы PM2.5', callback_data='='+callback_query.data+'+pm25')
+    bt_pm10      = aiogram.types.InlineKeyboardButton('Частицы PM10',  callback_data='='+callback_query.data+'+pm10')
+    bt_temp      = aiogram.types.InlineKeyboardButton('Температура',   callback_data='='+callback_query.data+'+temperature')
+    bt_pres      = aiogram.types.InlineKeyboardButton('Давление',      callback_data='='+callback_query.data+'+pressure')
+    bt_humidity  = aiogram.types.InlineKeyboardButton('Влажность',     callback_data='='+callback_query.data+'+humidity')
     KB_PARAMETER = aiogram.types.InlineKeyboardMarkup()
     KB_PARAMETER.row(bt_pm25, bt_pm10)
     KB_PARAMETER.row(bt_temp)
     KB_PARAMETER.row(bt_pres, bt_humidity)
     time: str
     if callback_query.data.startswith('day'):
-        time = f"день ({callback_query.data.split('+')[1].replace('-', '.')})"
+        time = callback_query.data.split('+')[1].replace('-', '.')
     else:
-        time = graphics.time_to_str(callback_query.data)
+        time = graphics.timeToStr(callback_query.data)
     await callback_query.message.edit_text(text=f'> Построение графика\n'
                                                 f'> За {time}\n'
                                                 f'Выберите параметр:', 
@@ -254,18 +266,18 @@ async def add_parameter(callback_query: aiogram.types.CallbackQuery):
 @dp.callback_query_handler(lambda c: (c.data and c.data == 'day'))
 async def select_day(callback_query: aiogram.types.CallbackQuery):  # choose date
     KB_DATES = aiogram.types.InlineKeyboardMarkup()
-    dates = graphics.dates()
-    if dates:
-        for date in dates:
-            pretty_date = date.replace('-', '.')
-            BT_temp = aiogram.types.InlineKeyboardButton(pretty_date, callback_data='day+' + date)
-            KB_DATES.insert(BT_temp)
-        await callback_query.message.edit_text(text='> Построение графика\n'
-                                                    '> За день\n'
-                                                    'Выберите дату:', reply_markup=KB_DATES)
-    else:
+    dates = await db.getAllDates()
+    if not dates:
         await callback_query.answer(text='За этот период нет данных 😔',
                                     show_alert=True)
+        return
+    for _date in dates:
+        BT_temp = aiogram.types.InlineKeyboardButton(_date.strftime('%d.%m.%Y'), callback_data='day+' + _date.strftime('%d-%m-%Y'))
+        KB_DATES.insert(BT_temp)
+    await callback_query.message.edit_text(text='> Построение графика\n'
+                                                '> За день\n'
+                                                'Выберите дату:', reply_markup=KB_DATES)
+        
 
 
 @dp.message_handler(lambda msg: (str(msg.from_user.id) in ADMIN_ID), commands=["admin", "log", "clear_log", "back"])
@@ -286,6 +298,7 @@ async def admin_commands(message: aiogram.types.Message):
         if path.exists(DIRECTORY + LOG_FILENAME):
             with open(DIRECTORY + LOG_FILENAME, 'rb') as f:
                 doc = aiogram.types.InputFile(f, filename='log.txt')
+                
                 await message.answer_document(doc)
         else:
             await message.answer("Файла логов нет!")
@@ -296,6 +309,7 @@ async def admin_commands(message: aiogram.types.Message):
         await message.answer('Лог был отчищен!')
     elif message.get_command() == "/back":  # gives back standart keyboard layout
         await message.answer('Возвращаю нормальную клавиатуру 😉', reply_markup=KB_START2)
+
 
 if __name__ == '__main__':
     aiogram.executor.start_polling(dp, skip_updates=True)
