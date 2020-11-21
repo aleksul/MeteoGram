@@ -57,6 +57,7 @@ def get_info(ip: str, errors_left=2):
         else:
             data = html_parser(response.text)
             if data:
+                db.connect()
                 OneMinuteData.create(
                     pm25=data['PM2.5'],
                     pm10=data['PM10'],
@@ -65,6 +66,7 @@ def get_info(ip: str, errors_left=2):
                     humidity=data['Humidity'],
                     time=data['Time']
                 )
+                db.close()
 
 
 if __name__ == "__main__":

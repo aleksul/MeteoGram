@@ -5,10 +5,7 @@ volumes:
 
 services:
   bot:
-    image: aleksul/meteo-bot
-    build:
-      context: ./bot/
-      dockerfile: Dockerfile
+    image: registry.gitlab.com/aleksul/meteo-bot/bot
     deploy:
       mode: global
       restart_policy:
@@ -26,10 +23,7 @@ services:
     volumes:
         - meteo_data:/meteo_data
   meteo-collector:
-    image: aleksul/meteo-collector
-    build:
-      context: ./data_collector/
-      dockerfile: Dockerfile
+    image: registry.gitlab.com/aleksul/meteo-bot/collector
     deploy:
       mode: global
       restart_policy:

@@ -42,7 +42,7 @@ class OneMinuteData(Model):
 
 class Plotter:
     def plot_minutes(self, data: list, value: str) -> bytes:  # plots a graph for x last minutes
-        assert(data)
+        assert data, 'Can NOT plot graph (minutes): data list is empty'
         self.isValueCorrect(value)
         converted = defaultdict(list)
         {converted[key].append(sub[key]) for sub in data for key in sub}  # turns list of dicts to dict of lists
@@ -99,7 +99,7 @@ class Plotter:
         return buffer
 
     def plot_day(self, data: dict, value: str) -> bytes:  # plots graph of a day with min and max for four time periods
-        assert(data)
+        assert data, 'Can NOT plot graph (day): data dict is empty'
         self.isValueCorrect(value)
         y1 = [data['morning']['min'], data['day']['min'], data['evening']['min'], data['night']['min']]
         y2 = [data['morning']['max'], data['day']['max'], data['evening']['max'], data['night']['max']]
@@ -132,7 +132,7 @@ class Plotter:
         return buffer
 
     def plot_month(self, data: list, value: str) -> bytes:  # plots month graph with min and max values of a day
-        assert(data)
+        assert data, 'Can NOT plot graph (month): data list is empty'
         self.isValueCorrect(value)
         converted = defaultdict(list) 
         {converted[key].append(sub[key]) for sub in data for key in sub}  # turns list of dicts to dict of lists
@@ -233,7 +233,7 @@ class DatabaseHandler:
             result = await OneMinuteData.filter(time__gte=start_point, time__lte=start_point+delta).values(value, 'time')
         else:
             result = await OneMinuteData.filter(time__gte=start_point+delta, time__lte=start_point).values(value, 'time')
-        assert(result)
+        assert result, 'Recieved nothing from database (getDataByTimedelta)'
         return result
     
     async def getDataByDay(self, day: date, value: str) -> dict:  # devides day in parts, than collect min and max for all of them
@@ -252,7 +252,7 @@ class DatabaseHandler:
                                                   Q(time__gte=ten_pm, time__lte=twelve_pm_next_day)).first()
         }
         for key in dayByParts.keys():
-            assert(dayByParts[key] is not None)
+            assert dayByParts[key] is not None, 'Received nothing from database (getDataByDay)'
             t1 = await dayByParts[key].annotate(max=Max(value)).values('max')
             t2 = await dayByParts[key].annotate(min=Min(value)).values('min')
             dayByParts[key] = t1[0]
@@ -263,7 +263,7 @@ class DatabaseHandler:
         start = datetime.combine(day, time(0, 0, 0))
         end = start + timedelta(days=1)
         values = await OneMinuteData.filter(time__gte=start, time__lte=end).values_list()
-        assert(values)
+        assert values, 'Recieved nothing from database (getRawDataByDay)'
         with NamedTemporaryFile(delete=False) as f:
             f.write(b'ID,PM2.5,PM10,Temperature,Pressure,Humidity,Time\n')
             for line in values:
@@ -280,7 +280,7 @@ class DatabaseHandler:
         result = await OneMinuteData.annotate(last=Max('id')).values()
         result = result[0]
         result.pop('id', None); result.pop('last', None)
-        assert(result is not None)
+        assert result is not None, 'Recieved nothing from database (getLastData)'
         return result
     
     async def getAllDates(self, includeToday = False) -> list:  # returns list of all saved day's
@@ -317,5 +317,5 @@ class DatabaseHandler:
             day.update(t1[0])
             day.update(t2[0])
             result.append(day)
-        assert(result)
+        assert result is not None, 'Recieved nothing from database (getMonthData)'
         return result
