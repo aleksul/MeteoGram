@@ -8,7 +8,11 @@ import logging
 
 
 class ProxyGrabber:
-    def __init__(self, timeout=3, filename='proxy.txt', site_to_test='http://example.org/'):
+
+    def __init__(self,
+                 timeout=3,
+                 filename='proxy.txt',
+                 site_to_test='http://example.org/'):
         self.site_to_test = site_to_test
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self.filename = filename
@@ -18,7 +22,10 @@ class ProxyGrabber:
         if result is not None:
             return f"http://{result}"
         else:
-            result, _ = asyncio.wait([self.broker_find(), self.pub_find()], timeout=30,  return_when="FIRST_COMPLETED")
+            result, _ = asyncio.wait(
+                [self.broker_find(), self.pub_find()],
+                timeout=30,
+                return_when="FIRST_COMPLETED")
             result = [i.result() for i in result if i.result() is not None]
             if result:
                 return f"http://{result[-1]}"
@@ -30,24 +37,29 @@ class ProxyGrabber:
         try:
             proxies = asyncio.Queue()
             broker = Broker(queue=proxies)
-            await broker.find(types=['HTTPS'], limit=proxies_num)  # finds 10(==proxies_num) https proxies
+            # finds 10(==proxies_num) https proxies
+            await broker.find(types=['HTTPS'], limit=proxies_num)
             proxy_temp = []
             for _ in range(proxies_num):
-                proxy_temp.append(await proxies.get())  # write proxies to the list as soon as possible
+                proxy_temp.append(await proxies.get(
+                ))  # write proxies to the list as soon as possible
         except Exception as err:  # something might go wrong
-            logging.error(f"Can't find a proxy with proxy broker: {type(err)}: {err}")
+            logging.error(
+                f"Can't find a proxy with proxy broker: {type(err)}: {err}")
             return None
         else:
-            # ProxyBroker returns a string with a lot of info, but we need only proxy
+            # ProxyBroker returns lots of info but we need only proxy
             proxy_temp = [str(i)[1:-1:].split()[4] for i in proxy_temp]
             logging.debug(f'Find proxies with ProxyBroker: {proxy_temp}')
             return await self.saver(proxy_temp)
 
     async def pub_find(self):
         try:
-            async with aiohttp.request('GET',
-                                       'http://pubproxy.com/api/proxy?limit=5&https=true&last_check=60&format=txt',
-                                       timeout=self.timeout) as resp:
+            async with aiohttp.request(
+                    'GET',
+                    'http://pubproxy.com/api/proxy?limit=5&https=true&'
+                    'last_check=60&format=txt',
+                    timeout=self.timeout) as resp:
                 assert resp.status == 200
                 proxy_temp = await resp.text()
         except AssertionError:
@@ -58,12 +70,14 @@ class ProxyGrabber:
             logging.debug(f'Find 5 proxy: {proxy_temp}')
             return await self.saver(proxy_temp)
 
-    async def check(self, proxy: str, session: aiohttp.ClientSession):  # simply tests access to the site via proxy
+    async def check(self, proxy: str, session: aiohttp.ClientSession):
+        # simply tests access to the site via proxy
         site = self.site_to_test
         proxy = "http://" + proxy
         ping = perf_counter()
         try:
-            async with session.get(site, proxy=proxy, timeout=self.timeout) as resp:
+            async with session.get(site, proxy=proxy,
+                                   timeout=self.timeout) as resp:
                 assert resp.status == 200
         except futures._base.TimeoutError:
             logging.debug(f"Too slow proxy: {proxy}")
@@ -72,27 +86,36 @@ class ProxyGrabber:
             logging.debug(f"Bad proxy: {proxy}")
             return None
         except Exception as err:
-            logging.debug(f"This proxy ({proxy}) doesn't work, exception: {type(err)}:{err}")
+            logging.debug(
+                f"This proxy ({proxy}) doesn't work, "
+                f"exception: {type(err)}:{err}"
+            )
             return None
         else:
             ping = perf_counter() - ping
-            logging.debug(f"This one seems to be good! Proxy: {proxy} Ping: {ping}")
+            logging.debug(
+                f"This one seems to be good! Proxy: {proxy} Ping: {ping}")
             proxy = {"proxy": proxy, "ping": ping}
             return proxy
 
     async def saver(self, proxies_to_check: list):
-        async with aiohttp.ClientSession() as session:  # it's better to use one session per all requests
+        # it's better to use one session per all requests
+        async with aiohttp.ClientSession() as session:
             # check all the proxies in parallel mode
-            checked_proxies = await asyncio.wait([self.check(i, session) for i in proxies_to_check])
-        # checker will return None if proxy is bad, now we need to leave only good results
+            checked_proxies = await asyncio.wait(
+                [self.check(i, session) for i in proxies_to_check])
+        # checker will return None if proxy is bad, we need only good results
         proxies_to_save = [i.result() for i in checked_proxies[0] if i.result()]
         if proxies_to_save:  # for the case, when all proxies are bad
-            proxies_to_save = sorted(proxies_to_save, key=lambda m: m['ping'])  # sorts proxies to find the fastest...
-            # ...and after we don't need ping argument anymore... and http:// prefix too
+            proxies_to_save = sorted(
+                proxies_to_save,
+                key=lambda m: m['ping'])  # sorts proxies to find the fastest...
+            # and after we don't need ping argument and http:// prefix anymore
             proxies_to_save = [i.get('proxy')[7::] for i in proxies_to_save]
             with open(self.filename, 'a+') as f:  # write proxies to the file
                 read = set(f.readlines())
-                proxies_to_save = list(set(proxies_to_save) - read)  # double-write protection
+                proxies_to_save = list(set(proxies_to_save) -
+                                       read)  # double-write protection
                 for proxy in proxies_to_save:
                     assert f.write(proxy + "\n")
                 logging.info(f'Saved proxies to the file: {proxies_to_save}')
@@ -100,7 +123,8 @@ class ProxyGrabber:
         else:
             return None
 
-    async def loader(self):  # almost same as saver, but it doesn't append file with new proxies
+    async def loader(self):
+        # almost same as saver, but it doesn't append file with new proxies
         if not path.exists(self.filename):  # Firstly, check if we have a file
             logging.warning("We don't have a proxy file!")
             return None
@@ -111,20 +135,29 @@ class ProxyGrabber:
             read_proxies = f.readlines()
         logging.debug('Everything is ok, opened the file with proxies...')
         read_proxies = [i[:-1:] for i in read_proxies]  # delete \n
-        async with aiohttp.ClientSession() as session:  # it's better to use one session per all requests
+        # it's better to use one session per all requests
+        async with aiohttp.ClientSession() as session:
             # check all the proxies in parallel mode
-            # use gather instead of wait because we don't need results in given order
-            checked_proxies = await asyncio.gather(*[(self.check(i, session)) for i in read_proxies])
+            checked_proxies = await asyncio.gather(
+                *[(self.check(i, session)) for i in read_proxies])
         checked_proxies = [i for i in checked_proxies if i]  # delete all None's
         if checked_proxies:  # for the case, when all proxies are bad
-            checked_proxies = sorted(checked_proxies, key=lambda m: m['ping'])  # sorts proxies to find the fastest
-            logging.info(f'Found fastest proxy {checked_proxies[0]["proxy"]} with ping {checked_proxies[0]["ping"]}sec')
-            # ...and after we don't need ping argument anymore... and http:// prefix too
+            checked_proxies = sorted(
+                checked_proxies,
+                key=lambda m: m['ping'])  # sorts proxies to find the fastest
+            logging.info(
+                f'Found fastest proxy {checked_proxies[0]["proxy"]} '
+                f'with ping {checked_proxies[0]["ping"]}sec'
+            )
+            # and after we don't need ping argument and http:// prefix anymore
             checked_proxies = [i.get('proxy')[7::] for i in checked_proxies]
-            with open(self.filename, "w") as f:  # open file as "writable" to delete all the content first
+            with open(
+                    self.filename, "w"
+            ) as f:  # open file as "writable" to delete all the content first
                 for i in checked_proxies:
                     f.write(i + '\n')
-            logging.debug(f'Wrote in file this list of proxies: {checked_proxies}')
+            logging.debug(
+                f'Wrote in file this list of proxies: {checked_proxies}')
             return checked_proxies[0]
         else:
             logging.warning('No working proxy in the file!')
@@ -133,13 +166,15 @@ class ProxyGrabber:
 
 
 async def check_site(site: str, timeout=aiohttp.ClientTimeout(total=5)) -> bool:
-        try:
-            async with aiohttp.request('GET',
-                                       site, timeout=timeout) as resp:
-                assert resp.status == 200
-                logging.debug(f"Internet seems to be connected. Response from {site}: {resp.status}")
-        except Exception as err:
-            logging.warning(f"Site {site} does not work: {type(err)}:{err}")
-            return False
-        else:
-            return True
+    try:
+        async with aiohttp.request('GET', site, timeout=timeout) as resp:
+            assert resp.status == 200
+            logging.debug(
+                f"Internet seems to be connected. "
+                f"Response from {site}: {resp.status}"
+            )
+    except Exception as err:
+        logging.warning(f"Site {site} does not work: {type(err)}:{err}")
+        return False
+    else:
+        return True

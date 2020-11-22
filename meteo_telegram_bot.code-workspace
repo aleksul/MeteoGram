@@ -1,4 +1,13 @@
 {
+	"extensions": {
+		"recommendations": [
+			"ms-python.python",
+			"ms-python.vscode-pylance",
+			"kevinrose.vsc-python-indent",
+			"ms-azuretools.vscode-docker",
+			"alexcvzz.vscode-sqlite"
+		]
+	},
 	"folders": [
 		{
 			"path": "."
@@ -7,12 +16,13 @@
 	"settings": {
 		"editor.renderWhitespace": "selection",
     	"editor.cursorBlinking": "phase",
-    	"html.format.wrapLineLength": 80,
-    	"python.linting.pylintEnabled": true,
+    	"editor.rulers": [80],
+		"python.linting.pylamaEnabled": true,
 		"python.linting.enabled": true,
     	"python.analysis.memory.keepLibraryAst": true,
 		"python.languageServer": "Pylance",
-		"python.formatting.provider": "black",
+		"python.formatting.provider": "yapf",
+		"python.pythonPath": "c:\\Projects\\meteo-bot\\.venv\\Scripts\\python.exe",
 		"python.autoComplete.extraPaths": [
 			"./bot",
 			"./data_collector"
@@ -20,7 +30,9 @@
 		"python.analysis.extraPaths": [
 			"./bot",
 			"./data_collector"
-		]
+		],
+		"telemetry.enableTelemetry": false,
+		"telemetry.enableCrashReporter": false,
 	},
 	"launch": {
 		"version": "0.2.0",

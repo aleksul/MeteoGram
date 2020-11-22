@@ -13,6 +13,7 @@ if 'DEBUG' in environ:
 
 db = peewee.SqliteDatabase(DB_PATH, autoconnect=False)
 
+
 class OneMinuteData(peewee.Model):
     pm25 = peewee.FloatField()
     pm10 = peewee.FloatField()
@@ -32,41 +33,49 @@ def html_parser(text) -> dict:
     data = []
     for i in range(len(soup) - 2):  # we don't need two last parameters (wifi)
         i = soup[i].get_text()
-        i = i.replace(u'\xa0', u' ')  # change space to SPACE (I'm just normalizing the string)
-        i = i.split()  # separate value from measurement units  # TODO use it as dict key
+        i = i.replace(
+            u'\xa0',
+            u' ')  # change space to SPACE (I'm just normalizing the string)
+        # separate value from measurement units  # TODO use it as dict key
+        i = i.split()
         temp = i.pop(0)
         if temp == '-':
             logging.warning("Received empty values")
             return {}
         data.append(float(temp))
     data[3] = round(data[3] * 100 / 133, 2)  # hPa to mm Hg
-    return {'PM2.5': data.pop(0), 'PM10': data.pop(0), 'Temperature': data.pop(0),
-            'Pressure': data.pop(0), 'Humidity': data.pop(0), 'Time': datetime.now()} 
+    return {
+        'PM2.5': data.pop(0),
+        'PM10': data.pop(0),
+        'Temperature': data.pop(0),
+        'Pressure': data.pop(0),
+        'Humidity': data.pop(0),
+        'Time': datetime.now()
+    }
 
 
 def get_info(ip: str, errors_left=2):
-        try:
-            response = requests.get(ip, timeout=15)
-            assert response.status_code == 200
-        except Exception as err:
-            logging.error(f"Getting info from meteostation error: {type(err)}:{err}")
-            logging.error(f'Retries left: {errors_left}')
-            errors_left -= 1
-            if errors_left > 0:
-                get_info(ip, errors_left=errors_left)
-        else:
-            data = html_parser(response.text)
-            if data:
-                db.connect()
-                OneMinuteData.create(
-                    pm25=data['PM2.5'],
-                    pm10=data['PM10'],
-                    temperature=data['Temperature'],
-                    pressure=data['Pressure'],
-                    humidity=data['Humidity'],
-                    time=data['Time']
-                )
-                db.close()
+    try:
+        response = requests.get(ip, timeout=15)
+        assert response.status_code == 200
+    except Exception as err:
+        logging.error(
+            f"Getting info from meteostation error: {type(err)}:{err}")
+        logging.error(f'Retries left: {errors_left}')
+        errors_left -= 1
+        if errors_left > 0:
+            get_info(ip, errors_left=errors_left)
+    else:
+        data = html_parser(response.text)
+        if data:
+            db.connect()
+            OneMinuteData.create(pm25=data['PM2.5'],
+                                 pm10=data['PM10'],
+                                 temperature=data['Temperature'],
+                                 pressure=data['Pressure'],
+                                 humidity=data['Humidity'],
+                                 time=data['Time'])
+            db.close()
 
 
 if __name__ == "__main__":
