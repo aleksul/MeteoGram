@@ -25,7 +25,7 @@ logging.info("Program started")
 
 ADMIN_ID = environ.get("ADMIN_IDs", "").split(",")
 BOT_TOKEN = environ.get("BotToken")
-assert BOT_TOKEN is None, "Bot token was NOT set"
+assert BOT_TOKEN is not None, "Bot token was NOT set"
 
 KB_START = ReplyKeyboardMarkup(one_time_keyboard=False,
                                resize_keyboard=True,

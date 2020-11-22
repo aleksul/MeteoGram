@@ -98,6 +98,7 @@ if __name__ == "__main__":
     else:
         ip = environ.get("MeteostationIP", "192.168.0.2")
         ip = 'http://' + ip + '/values'
+        get_info(ip)
         schedule.every(60).seconds.do(get_info, ip)
         while True:
             schedule.run_pending()
