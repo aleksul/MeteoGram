@@ -43,9 +43,8 @@ class OneMinuteData(Model):
 
 
 class Plotter:
-
-    def plot_minutes(self, data: list,
-                     value: str) -> bytes:  # plots a graph for x last minutes
+    def plot_minutes(self, data: list, value: str) -> bytes:
+        # plots a graph for x last minutes
         assert data, 'Can NOT plot graph (minutes): data list is empty'
         self.isValueCorrect(value)
         converted = defaultdict(list)
@@ -72,14 +71,16 @@ class Plotter:
                     )
                 _time.append(minutes_temp[i - 1])
         plt.plot(_time, convertedData, marker='.')
+        # invert x axis + add extra space on y-axis
         plt.xlim(
-            left=_time[0] + timedelta(minutes=1),
-            right=_time[-1] -
-            timedelta(minutes=1))  # invert x axis + add extra space on y-axis
+            left=_time[0] - timedelta(minutes=1),
+            right=_time[-1] + timedelta(minutes=1)
+            )
         plt.gcf().autofmt_xdate()  # rotate the date
         ax = plt.gca()  # gca stands for 'get current axis'
-        ax.xaxis.set_major_formatter(
-            DateFormatter('%H:%M'))  # sets major formatter to '23:59'
+        # set major formatter to '23:59'
+        ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
+        assert 5 <= labels_count <= 180, 'Not enough data to plot'
         if labels_count <= 15:
             ax.xaxis.set_major_locator(MinuteLocator(byminute=range(60)))
         elif labels_count <= 30:
@@ -99,14 +100,11 @@ class Plotter:
             ticks_minute = list(range(0, 60, 10))
             ax.xaxis.set_major_locator(MinuteLocator(byminute=ticks_minute))
             ax.xaxis.set_minor_formatter(NullFormatter())
-            every_minute = list(range(0, 60))
+            every_minute = list(range(0, 60, 2))
             ax.xaxis.set_minor_locator(
                 MinuteLocator(
                     byminute=[i for i in every_minute
                               if i not in ticks_minute]))
-        else:
-            logging.error('Wrong label counter!')
-            return None
         plt.xlabel('Время')
         plt.ylabel(self.valueToStrWithUnits(value))
         ax.set_autoscale_on(True)
@@ -119,9 +117,8 @@ class Plotter:
         plt.close()
         return buffer
 
-    def plot_day(
-        self, data: dict, value: str
-    ) -> bytes:  # plots graph of a day with min and max for four time periods
+    def plot_day(self, data: dict, value: str) -> bytes:
+        # plots graph of a day with min and max for four time periods
         assert data, 'Can NOT plot graph (day): data dict is empty'
         self.isValueCorrect(value)
         y1 = [
@@ -173,9 +170,8 @@ class Plotter:
         plt.close()
         return buffer
 
-    def plot_month(
-        self, data: list, value: str
-    ) -> bytes:  # plots month graph with min and max values of a day
+    def plot_month(self, data: list, value: str) -> bytes:
+        # plots month graph with min and max values of a day
         assert data, 'Can NOT plot graph (month): data list is empty'
         self.isValueCorrect(value)
         converted = defaultdict(list)
@@ -272,11 +268,14 @@ class Plotter:
 
 
 class DatabaseHandler:
-
     def __init__(self, db_path: str):
         self.DB_PATH = db_path
         async_run(
-            Tortoise.init(db_url=self.DB_PATH, modules={'models': ['plotter']}))
+            Tortoise.init(
+                db_url=self.DB_PATH,
+                modules={'models': ['plotter']}
+                )
+            )
 
     @staticmethod
     def isValueCorrect(value: str) -> bool:  # checks if passed value is correct
@@ -285,25 +284,28 @@ class DatabaseHandler:
             raise Exception("Wrong value")
         return True
 
-    async def getDataByTimedelta(
-            self, start_point: datetime, delta: timedelta,
-            value: str) -> list:  # returns data by timedelta
+    async def getDataByTimedelta(self, start_point: datetime, delta: timedelta,
+                                 value: str) -> list:
+        # returns data by timedelta
         self.isValueCorrect(value)
         result: list
-        if delta >= timedelta():
-            result = await OneMinuteData.filter(time__gte=start_point,
-                                                time__lte=start_point +
-                                                delta).values(value, 'time')
+        if delta >= timedelta():  # if delta >= 0
+            result = await OneMinuteData \
+                .filter(time__gte=start_point,
+                        time__lte=start_point + delta) \
+                .order_by('time') \
+                .values(value, 'time')
         else:
-            result = await OneMinuteData.filter(time__gte=start_point + delta,
-                                                time__lte=start_point).values(
-                                                    value, 'time')
-        assert result, 'Recieved nothing (getDataByTimedelta)'
+            result = await OneMinuteData \
+                .filter(time__gte=start_point + delta,
+                        time__lte=start_point) \
+                .order_by('time') \
+                .values(value, 'time')
+        assert result, 'Recieved nothing'
         return result
 
-    async def getDataByDay(
-        self, day: date, value: str
-    ) -> dict:  # devides day in parts, than collect min and max for all of them
+    async def getDataByDay(self, day: date, value: str) -> dict:
+        # devides day in parts, than collect min and max for all of them
         self.isValueCorrect(value)
         four_am = datetime.combine(day, time(4, 0, 0))
         ten_am = datetime.combine(day, time(10, 0, 0))
@@ -313,37 +315,50 @@ class DatabaseHandler:
         twelve_pm_next_day = twelve_pm + timedelta(days=1)
         dayByParts = {
             'morning':
-                await OneMinuteData.filter(time__gte=four_am,
-                                           time__lt=ten_am).first(),
+                await OneMinuteData
+                .annotate(max=Max(value))
+                .annotate(min=Min(value))
+                .filter(time__gte=four_am, time__lt=ten_am)
+                .values("max", "min"),
             'day':
-                await OneMinuteData.filter(time__gte=ten_am,
-                                           time__lt=four_pm).first(),
+                await OneMinuteData
+                .annotate(max=Max(value))
+                .annotate(min=Min(value))
+                .filter(time__gte=ten_am, time__lt=four_pm)
+                .values("max", "min"),
             'evening':
-                await OneMinuteData.filter(time__gte=four_pm,
-                                           time__lt=ten_pm).first(),
+                await OneMinuteData
+                .annotate(max=Max(value))
+                .annotate(min=Min(value))
+                .filter(time__gte=four_pm, time__lt=ten_pm)
+                .values("max", "min"),
             'night':
-                await OneMinuteData.filter(
-                    Q(time__gte=twelve_pm, time__lt=four_am) |
-                    Q(time__gte=ten_pm, time__lte=twelve_pm_next_day)).first()
+                await OneMinuteData
+                .annotate(max=Max(value))
+                .annotate(min=Min(value))
+                .filter(
+                    Q(time__gte=twelve_pm, time__lt=four_am)
+                    | Q(time__gte=ten_pm, time__lte=twelve_pm_next_day)
+                )
+                .values("max", "min")
         }
         for key in dayByParts.keys():
-            assert dayByParts[
-                key] is not None, 'Received nothing (getDataByDay)'
-            t1 = await dayByParts[key].annotate(max=Max(value)).values('max')
-            t2 = await dayByParts[key].annotate(min=Min(value)).values('min')
-            dayByParts[key] = t1[0]
-            dayByParts[key].update(t2[0])
+            assert dayByParts[key] is not None, 'Received nothing'
+            dayByParts[key] = dayByParts[key].pop(0)
         return dayByParts
 
-    async def getRawDataByDay(
-            self, day: date) -> IO:  # creates .csv file with all day data
+    async def getRawDataByDay(self, day: date) -> IO:
+        # creates .csv file with all day data
         start = datetime.combine(day, time(0, 0, 0))
         end = start + timedelta(days=1)
-        values = await OneMinuteData.filter(time__gte=start,
-                                            time__lte=end).values_list()
-        assert values, 'Recieved nothing (getRawDataByDay)'
+        values = await OneMinuteData \
+            .filter(time__gte=start,
+                    time__lte=end) \
+            .values_list('pm25', 'pm10', 'temperature',
+                         'pressure', 'humidity', 'time')
+        assert values, 'Recieved nothing'
         with NamedTemporaryFile(delete=False) as f:
-            f.write(b'ID,PM2.5,PM10,Temperature,Pressure,Humidity,Time\n')
+            f.write(b'PM2.5,PM10,Temperature,Pressure,Humidity,Time\n')
             for line in values:
                 stroka = ''
                 for value in line:
@@ -354,17 +369,17 @@ class DatabaseHandler:
                 f.write(bytes(stroka, 'utf-8'))
         return f
 
-    async def getLastData(self) -> dict:  # returns last written data
+    async def getLastData(self) -> dict:
+        # returns last written data
         result = await OneMinuteData.annotate(last=Max('id')).values()
         result = result[0]
         result.pop('id', None)
         result.pop('last', None)
-        assert result is not None, 'Recieved nothing (getLastData)'
+        assert result is not None, 'Recieved nothing'
         return result
 
-    async def getAllDates(
-            self,
-            includeToday=False) -> list:  # returns list of all saved day's
+    async def getAllDates(self, includeToday=False) -> list:
+        # returns list of all saved day's
         start_day = date.today()
         result = []
         if includeToday:
@@ -373,10 +388,8 @@ class DatabaseHandler:
                 start_day -= timedelta(days=1)
         else:
             start_day -= timedelta(days=1)
-        before, after = datetime.combine(start_day, time(0, 0,
-                                                         0)), datetime.combine(
-                                                             start_day,
-                                                             time(23, 59, 59))
+        before = datetime.combine(start_day, time(0, 0, 0))
+        after = datetime.combine(start_day, time(23, 59, 59))
         flag = await OneMinuteData.exists(time__gte=before, time__lte=after)
         while flag:
             result.append(after.date())
@@ -385,24 +398,25 @@ class DatabaseHandler:
             flag = await OneMinuteData.exists(time__gte=before, time__lte=after)
         return result
 
-    async def getMonthData(
-            self,
-            value: str) -> list:  # returns min and max for every saved day
+    async def getMonthData(self, value: str) -> list:
+        # returns min and max for every saved day
         self.isValueCorrect(value)
         result = []
         dates = await self.getAllDates()
+        assert len(dates) >= 2, "Got not enough info"
         if len(dates) > 30:
-            dates = dates[0:30]
-        for _date in dates:
-            day_start = datetime.combine(_date, time(0, 0, 0))
-            day_end = datetime.combine(_date, time(23, 59, 59))
-            day_data = await OneMinuteData.filter(time__gte=day_start,
-                                                  time__lte=day_end).first()
-            t1 = await day_data.annotate(max=Max(value)).values('max')
-            t2 = await day_data.annotate(min=Min(value)).values('min')
-            day = {'date': _date}
-            day.update(t1[0])
-            day.update(t2[0])
-            result.append(day)
-        assert result is not None, 'Recieved nothing (getMonthData)'
+            dates = dates[0:30]  # limit to 30 dates
+        for day in dates:
+            day_start = datetime.combine(day, time(0, 0, 0))
+            day_end = day_start + timedelta(days=1)
+            temp = await OneMinuteData \
+                .annotate(min=Min(value)) \
+                .annotate(max=Max(value)) \
+                .filter(time__gte=day_start,
+                        time__lt=day_end) \
+                .values('max', 'min')
+            day_data = {'date': day}
+            day_data.update(temp.pop(0))
+            result.append(day_data)
+        assert result is not None, 'Recieved nothing'
         return result

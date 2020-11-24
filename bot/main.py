@@ -163,7 +163,7 @@ async def send_raw_kb(message: Message):
                                       callback_data="=raw+" +
                                       day.strftime("%d-%m-%Y"))
         KB_DATES.insert(BT_day)
-    await message.answer("> Просмотр исходного файла\n Выберите дату:",
+    await message.answer("> Просмотр исходного файла\nВыберите дату:",
                          reply_markup=KB_DATES)
 
 
@@ -184,7 +184,7 @@ async def send_raw_file(callback_query: CallbackQuery):
 @dp.message_handler(commands=["graph"])
 async def send_graph_kb(message: Message):
     await message.answer(
-        "> Построение графика\n Выберите временной промежуток:",
+        "> Построение графика\nВыберите временной промежуток:",
         reply_markup=KB_CHOOSE_TIME,
     )
 
