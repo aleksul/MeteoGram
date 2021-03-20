@@ -28,30 +28,30 @@ class OneMinuteData(peewee.Model):
 
 
 def html_parser(text) -> dict:
-    soup = BeautifulSoup(text, 'html.parser')
-    soup = soup.find_all('td', class_='r')
-    data = []
-    for i in range(len(soup) - 2):  # we don't need two last parameters (wifi)
-        i = soup[i].get_text()
-        i = i.replace(
-            u'\xa0',
-            u' ')  # change space to SPACE (I'm just normalizing the string)
-        # separate value from measurement units  # TODO use it as dict key
-        i = i.split()
-        temp = i.pop(0)
-        if temp == '-':
-            logging.warning("Received empty values")
-            return {}
-        data.append(float(temp))
-    data[3] = round(data[3] * 100 / 133, 2)  # hPa to mm Hg
-    return {
-        'PM2.5': data.pop(0),
-        'PM10': data.pop(0),
-        'Temperature': data.pop(0),
-        'Pressure': data.pop(0),
-        'Humidity': data.pop(0),
-        'Time': datetime.now()
-    }
+    data = {
+        'PM2.5': -1,
+        'PM10': -1,
+        'Temperature': -1,
+        'Pressure': -1,
+        'Humidity': -1
+        }
+    for row in BeautifulSoup(text, 'html.parser').find('table').find_all("tr"):
+        row = BeautifulSoup(row, 'html.parser').find_all('td')
+        for tag in range(0, len(row)):
+            row[tag] = row[tag].string  # prettify
+        if len(row) == 3:
+            # translate
+            row[1] = row[1].replace('Температура', 'Temperature')
+            row[1] = row[1].replace('Давление воздуха', 'Pressure')
+            row[1] = row[1].replace('Относительная влажность', 'Humidity')
+            if row[1] in data.keys():
+                data[row[1]] = float(row[2].split()[0])  # convert values
+                if row[1] == 'Pressure':  # hPa to mmHg
+                    data[row[1]] = round(data[row[1]] * 100 / 133, 2)
+    assert not(all(item == -1 for item in data.values())), "All values \
+        haven't changed yet"
+    data.update(Time=datetime.now())  # adding timestamp
+    return data
 
 
 def get_info(ip: str, errors_left=2):

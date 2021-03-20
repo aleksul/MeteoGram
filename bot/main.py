@@ -158,6 +158,7 @@ async def send_raw_kb(message: Message):
     dates = await db.getAllDates(includeToday=True)
     if len(dates) > 30:
         dates = dates[0:30]
+    dates.reverse()
     for day in dates:
         BT_day = InlineKeyboardButton(day.strftime("%d.%m.%Y"),
                                       callback_data="=raw+" +
@@ -185,7 +186,7 @@ async def send_raw_file(callback_query: CallbackQuery):
 async def send_graph_kb(message: Message):
     await message.answer(
         "> Построение графика\nВыберите временной промежуток:",
-        reply_markup=KB_CHOOSE_TIME,
+        reply_markup=KB_CHOOSE_TIME
     )
 
 
@@ -231,7 +232,7 @@ async def plot_graph_day(callback_query: CallbackQuery):
         await callback_query.message.answer_photo(
             photo,
             caption=f"{graphics.valueToStr(parameter)} за "
-            f'{day.strftime("%d.%m.%Y")}',
+            f'{day.strftime("%d.%m.%Y")}'
         )
 
 
@@ -245,7 +246,7 @@ async def plot_graph_minutes(callback_query: CallbackQuery):
             await db.getDataByTimedelta(datetime.now(),
                                         timedelta(minutes=-1 * int(code)),
                                         parameter),
-            parameter,
+            parameter
         )
     except Exception as e:
         logging.warning(f"Catched error while tring to plot minutes graph: "
@@ -259,7 +260,7 @@ async def plot_graph_minutes(callback_query: CallbackQuery):
         await callback_query.message.answer_photo(
             photo,
             caption=f"{graphics.valueToStr(parameter)} за "
-            f"{graphics.timeToStr(code)}",
+            f"{graphics.timeToStr(code)}"
         )
 
 
@@ -300,7 +301,7 @@ async def add_parameter(callback_query: CallbackQuery):
         time = graphics.timeToStr(callback_query.data)
     await callback_query.message.edit_text(
         text=f"> Построение графика\n> За {time}\nВыберите параметр:",
-        reply_markup=KB_PARAMETER,
+        reply_markup=KB_PARAMETER
     )
 
 
@@ -312,6 +313,9 @@ async def select_day(callback_query: CallbackQuery):  # choose date
         await callback_query.answer(text="За этот период нет данных 😔",
                                     show_alert=True)
         return
+    if len(dates) > 30:
+        dates = dates[0:30]
+    dates.reverse()
     for day in dates:
         BT_temp = InlineKeyboardButton(day.strftime("%d.%m.%Y"),
                                        callback_data="day+" +
@@ -319,13 +323,13 @@ async def select_day(callback_query: CallbackQuery):  # choose date
         KB_DATES.insert(BT_temp)
     await callback_query.message.edit_text(
         text="> Построение графика\n> За день\nВыберите дату:",
-        reply_markup=KB_DATES,
+        reply_markup=KB_DATES
     )
 
 
 @dp.message_handler(
     lambda msg: (str(msg.from_user.id) in ADMIN_ID),
-    commands=["admin", "log", "clear_log", "back"],
+    commands=["admin", "log", "clear_log", "back"]
 )
 async def admin_commands(message: Message):
     # handels only messages from admins, only special commands
@@ -339,7 +343,7 @@ async def admin_commands(message: Message):
             f" /clear_log для того чтобы его отчистить\n"
             f"• Напишите /back для "
             f"возврашения стандартной клавиатуры",
-            reply_markup=KB_ADMIN,
+            reply_markup=KB_ADMIN
         )
     elif message.get_command() == "/log":
         # sends log file
