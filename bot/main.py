@@ -8,7 +8,8 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.types import ChatActions, InputFile
 
 from proxy_helper import ProxyGrabber, check_site
-from plotter import Plotter, DatabaseHandler
+from plotter import Plotter
+from database import DatabaseHandler
 import logging
 from os import environ, remove
 from datetime import datetime, timedelta
@@ -27,27 +28,12 @@ ADMIN_ID = environ.get("ADMIN_IDs", "").split(",")
 BOT_TOKEN = environ.get("BotToken")
 assert BOT_TOKEN is not None, "Bot token was NOT set"
 
-KB_START = ReplyKeyboardMarkup(one_time_keyboard=False,
-                               resize_keyboard=True,
-                               row_width=2)
+KB_START = ReplyKeyboardMarkup(one_time_keyboard=False, resize_keyboard=True, row_width=2)
 KB_START.add("/now", "/graph", "/help")
 KB_START2 = ReplyKeyboardMarkup(one_time_keyboard=False, resize_keyboard=True)
 KB_START2.add("/now", "/graph")
-KB_ADMIN = ReplyKeyboardMarkup(one_time_keyboard=False,
-                               resize_keyboard=True,
-                               row_width=2)
+KB_ADMIN = ReplyKeyboardMarkup(one_time_keyboard=False, resize_keyboard=True, row_width=2)
 KB_ADMIN.add("/log", "/clear_log", "/back")
-
-bt_month = InlineKeyboardButton("Месяц", callback_data="mon")  # month
-bt_day = InlineKeyboardButton("День", callback_data="day")  # day
-bt_3h = InlineKeyboardButton("3 часа", callback_data="180")  # 3 hours
-bt_1h = InlineKeyboardButton("1 час", callback_data="060")  # 1 hour
-bt_30min = InlineKeyboardButton("Полчаса", callback_data="030")  # 30 minutes
-bt_15min = InlineKeyboardButton("15 минут", callback_data="015")  # 15 minutes
-KB_CHOOSE_TIME = InlineKeyboardMarkup()
-KB_CHOOSE_TIME.row(bt_15min, bt_30min, bt_1h)
-KB_CHOOSE_TIME.row(bt_3h, bt_day)
-KB_CHOOSE_TIME.row(bt_month)
 
 
 async def doWeNeedProxy() -> bool:
@@ -56,13 +42,10 @@ async def doWeNeedProxy() -> bool:
         check_site("http://example.org/"),
         check_site(f"https://api.telegram.org/bot{BOT_TOKEN}/getMe"),
     )
-    logging.info(f"Internet test results:"
-                 f"example.org: {results[0]}, "
-                 f"telegram: {results[1]}")
+    logging.info(f"Internet test results:" f"example.org: {results[0]}, " f"telegram: {results[1]}")
     if not results[0]:  # we dont have internet access
         raise OSError("No internet")
-    elif (results[0] and
-          not results[1]):  # we have internet access but no access to telegram
+    elif (results[0] and not results[1]):  # we have internet access but no access to telegram
         return True
     elif results[0] and results[1]:  # we have access to telegram without proxy!
         return False
@@ -81,8 +64,7 @@ if loop.run_until_complete(doWeNeedProxy()):
         filename=f"{DIRECTORY}proxy.dat",
         site_to_test=f"https://api.telegram.org/bot{BOT_TOKEN}/getMe",
     )
-    BOT = aiogram_bot(token=BOT_TOKEN,
-                      proxy=loop.run_until_complete(proxyFinder.grab()))
+    BOT = aiogram_bot(token=BOT_TOKEN, proxy=loop.run_until_complete(proxyFinder.grab()))
 else:
     BOT = aiogram_bot(token=BOT_TOKEN)
 dp = Dispatcher(BOT)
@@ -143,13 +125,12 @@ async def send_info(message: Message):
 @dp.message_handler(commands=["now"])
 async def send_now(message: Message):
     now = await db.getLastData()
-    await message.answer(
-        f'Данные собраны в {now["time"].strftime("%H:%M:%S")}\n\n'
-        f'Температура: {now["temperature"]} °C\n'
-        f'Давление: {now["pressure"]} мм/рт.ст.\n'
-        f'Влажность: {now["humidity"]} %\n'
-        f'Частицы PM2.5: {now["pm25"]} мкгр/м³\n'
-        f'Частицы PM10: {now["pm10"]} мкгр/м³')
+    await message.answer(f'Данные собраны в {now["time"].strftime("%H:%M:%S")}\n\n'
+                         f'Температура: {now["temperature"]} °C\n'
+                         f'Давление: {now["pressure"]} мм/рт.ст.\n'
+                         f'Влажность: {now["humidity"]} %\n'
+                         f'Частицы PM2.5: {now["pm25"]} мкгр/м³\n'
+                         f'Частицы PM10: {now["pm10"]} мкгр/м³')
 
 
 @dp.message_handler(commands=["raw"])
@@ -161,17 +142,14 @@ async def send_raw_kb(message: Message):
     dates.reverse()
     for day in dates:
         BT_day = InlineKeyboardButton(day.strftime("%d.%m.%Y"),
-                                      callback_data="=raw+" +
-                                      day.strftime("%d-%m-%Y"))
+                                      callback_data="=raw+" + day.strftime("%d-%m-%Y"))
         KB_DATES.insert(BT_day)
-    await message.answer("> Просмотр исходного файла\nВыберите дату:",
-                         reply_markup=KB_DATES)
+    await message.answer("> Просмотр исходного файла\nВыберите дату:", reply_markup=KB_DATES)
 
 
 @dp.callback_query_handler(lambda c: (c.data and c.data.startswith("=raw")))
 async def send_raw_file(callback_query: CallbackQuery):
-    await BOT.send_chat_action(callback_query.message.chat.id,
-                               ChatActions.UPLOAD_DOCUMENT)
+    await BOT.send_chat_action(callback_query.message.chat.id, ChatActions.UPLOAD_DOCUMENT)
     strDate = callback_query.data.split("+")[1]
     day = datetime.strptime(strDate, "%d-%m-%Y").date()
     fi = await db.getRawDataByDay(day)
@@ -182,154 +160,71 @@ async def send_raw_file(callback_query: CallbackQuery):
     await callback_query.answer()
 
 
+def isValueCorrect(value: str) -> bool:
+    return value.lower() in [
+        "температура",
+        "давление",
+        "влажность",
+        "pm25",
+        "pm2.5",
+        "pm10",
+    ]
+
+
+def translateParameter(value: str) -> str:
+    translation = {
+        "температура": "temperature",
+        "давление": "pressure",
+        "влажность": "humidity",
+        "pm25": "pm25",
+        "pm2.5": "pm25",
+        "pm10": "pm10",
+    }
+    return translation.get(value)
+
+
 @dp.message_handler(commands=["graph"])
 async def send_graph_kb(message: Message):
-    await message.answer(
-        "> Построение графика\nВыберите временной промежуток:",
-        reply_markup=KB_CHOOSE_TIME
-    )
-
-
-@dp.callback_query_handler(lambda c: (c.data and c.data.startswith("=mon")))
-async def plot_graph_month(callback_query: CallbackQuery):
-    code = callback_query.data[1::].split("+")
-    code, parameter = code[0], code[1]
-    photo: bytes
-    try:
-        photo = graphics.plot_month(await db.getMonthData(parameter), parameter)
-    except Exception as e:
-        logging.warning(f"Catched error while tring to plot month graph: "
-                        f"{type(e)}: {e}")
-        await callback_query.answer(text="За этот период нет данных 😔",
-                                    show_alert=True)
+    data = message.text[6:].split(",")
+    data = [i.strip() for i in data if i.strip()]
+    if not data:
+        await message.answer("После команды укажите временной промежуток"
+                             "и параметр через запятую.\n\n Пример 1: "
+                             "/graph час назад, сейчас, температура\n"
+                             "Пример 2: /graph день, 25.05.21, влажность\n"
+                             "Пример 3: /graph месяц, pm2.5")
+    elif data[0] == "месяц":
+        photo: bytes
+        try:
+            # checks
+            if len(data) != 2:
+                await message.answer("Запрос составлен неверно!")
+                return
+            if not isValueCorrect(data[1]):
+                await message.answer("Значение указано неверно!\n"
+                                     "Возможные варианты: температура, давление"
+                                     ", влажность, pm2.5, pm10")
+                return
+            # graph building
+            parameter = translateParameter(data[1])
+            month_data = await db.getMonthData(parameter)
+            photo = graphics.plot_month(month_data, parameter)
+        except Exception as e:
+            logging.warning(f"Plotting month graph error: {type(e)}: {e}")
+            await message.answer("Невозможно построить график 😔")
+        else:
+            await BOT.send_chat_action(message.chat.id, ChatActions.UPLOAD_PHOTO)
+            await message.answer_photo(
+                photo, caption=f"{graphics.valueToStr(parameter)} за последний месяц")
+    elif data[0] == "день":
+        pass
     else:
-        await callback_query.answer()
-        await BOT.send_chat_action(callback_query.message.chat.id,
-                                   ChatActions.UPLOAD_PHOTO)
-        await callback_query.message.answer_photo(
-            photo,
-            caption=f"{graphics.valueToStr(parameter)} за последний месяц")
-
-
-@dp.callback_query_handler(lambda c: (c.data and c.data.startswith("=day")))
-# TODO: period of time chooser
-async def plot_graph_day(callback_query: CallbackQuery):
-    code = callback_query.data[1::].split("+")
-    code, day, parameter = code[0], code[1], code[2]
-    day = datetime.strptime(day, "%d-%m-%Y").date()
-    try:
-        photo = graphics.plot_day(await db.getDataByDay(day, parameter),
-                                  parameter)
-    except Exception as e:
-        logging.warning(f"Catched error while tring to plot day graph: "
-                        f"{type(e)}: {e}")
-        await callback_query.answer(text="За этот период нет данных 😔",
-                                    show_alert=True)
-    else:
-        await callback_query.answer()
-        await BOT.send_chat_action(callback_query.message.chat.id,
-                                   ChatActions.UPLOAD_PHOTO)
-        await callback_query.message.answer_photo(
-            photo,
-            caption=f"{graphics.valueToStr(parameter)} за "
-            f'{day.strftime("%d.%m.%Y")}'
-        )
-
-
-@dp.callback_query_handler(
-    lambda c: (c.data and c.data[0:4] in ["=015", "=030", "=060", "=180"]))
-async def plot_graph_minutes(callback_query: CallbackQuery):
-    code = callback_query.data[1::].split("+")
-    parameter, code = code[1], code[0]
-    try:
-        photo = graphics.plot_minutes(
-            await db.getDataByTimedelta(datetime.now(),
-                                        timedelta(minutes=-1 * int(code)),
-                                        parameter),
-            parameter
-        )
-    except Exception as e:
-        logging.warning(f"Catched error while tring to plot minutes graph: "
-                        f"{type(e)}: {e}")
-        await callback_query.answer(text="За этот период нет данных 😔",
-                                    show_alert=True)
-    else:
-        await callback_query.answer()
-        await BOT.send_chat_action(callback_query.message.chat.id,
-                                   ChatActions.UPLOAD_PHOTO)
-        await callback_query.message.answer_photo(
-            photo,
-            caption=f"{graphics.valueToStr(parameter)} за "
-            f"{graphics.timeToStr(code)}"
-        )
-
-
-@dp.callback_query_handler(
-    lambda c: (c.data and (c.data in ["015", "030", "060", "180", "mon"]
-                           or c.data.startswith("day+")
-                           )
-               )
-    )
-async def add_parameter(callback_query: CallbackQuery):
-    if callback_query.data == "mon" and not await db.getAllDates():
-        await callback_query.answer(text="За этот период нет данных 😔",
-                                    show_alert=True)
-        return
-    bt_pm25 = InlineKeyboardButton("Частицы PM2.5",
-                                   callback_data="=" + callback_query.data +
-                                   "+pm25")
-    bt_pm10 = InlineKeyboardButton("Частицы PM10",
-                                   callback_data="=" + callback_query.data +
-                                   "+pm10")
-    bt_temp = InlineKeyboardButton("Температура",
-                                   callback_data="=" + callback_query.data +
-                                   "+temperature")
-    bt_pres = InlineKeyboardButton("Давление",
-                                   callback_data="=" + callback_query.data +
-                                   "+pressure")
-    bt_humidity = InlineKeyboardButton("Влажность",
-                                       callback_data="=" + callback_query.data +
-                                       "+humidity")
-    KB_PARAMETER = InlineKeyboardMarkup()
-    KB_PARAMETER.row(bt_pm25, bt_pm10)
-    KB_PARAMETER.row(bt_temp)
-    KB_PARAMETER.row(bt_pres, bt_humidity)
-    time: str
-    if callback_query.data.startswith("day"):
-        time = callback_query.data.split("+")[1].replace("-", ".")
-    else:
-        time = graphics.timeToStr(callback_query.data)
-    await callback_query.message.edit_text(
-        text=f"> Построение графика\n> За {time}\nВыберите параметр:",
-        reply_markup=KB_PARAMETER
-    )
-
-
-@dp.callback_query_handler(lambda c: (c.data and c.data == "day"))
-async def select_day(callback_query: CallbackQuery):  # choose date
-    KB_DATES = InlineKeyboardMarkup()
-    dates = await db.getAllDates()
-    if not dates:
-        await callback_query.answer(text="За этот период нет данных 😔",
-                                    show_alert=True)
-        return
-    if len(dates) > 30:
-        dates = dates[0:30]
-    dates.reverse()
-    for day in dates:
-        BT_temp = InlineKeyboardButton(day.strftime("%d.%m.%Y"),
-                                       callback_data="day+" +
-                                       day.strftime("%d-%m-%Y"))
-        KB_DATES.insert(BT_temp)
-    await callback_query.message.edit_text(
-        text="> Построение графика\n> За день\nВыберите дату:",
-        reply_markup=KB_DATES
-    )
+        pass
 
 
 @dp.message_handler(
     lambda msg: (str(msg.from_user.id) in ADMIN_ID),
-    commands=["admin", "log", "clear_log", "back"]
+    commands=["admin", "log", "clear_log", "back"],
 )
 async def admin_commands(message: Message):
     # handels only messages from admins, only special commands
@@ -343,7 +238,7 @@ async def admin_commands(message: Message):
             f" /clear_log для того чтобы его отчистить\n"
             f"• Напишите /back для "
             f"возврашения стандартной клавиатуры",
-            reply_markup=KB_ADMIN
+            reply_markup=KB_ADMIN,
         )
     elif message.get_command() == "/log":
         # sends log file
@@ -356,10 +251,8 @@ async def admin_commands(message: Message):
             pass
         logging.info("Cleared log")
         await message.answer("Лог был отчищен!")
-    elif message.get_command(
-    ) == "/back":  # gives back standart keyboard layout
-        await message.answer("Возвращаю нормальную клавиатуру 😉",
-                             reply_markup=KB_START2)
+    elif message.get_command() == "/back":  # gives back standart keyboard layout
+        await message.answer("Возвращаю нормальную клавиатуру 😉", reply_markup=KB_START2)
 
 
 if __name__ == "__main__":

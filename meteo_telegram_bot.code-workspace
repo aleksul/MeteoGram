@@ -2,8 +2,10 @@
 	"extensions": {
 		"recommendations": [
 			"ms-python.python",
+			"ms-toolsai.jupyter",
 			"ms-python.vscode-pylance",
 			"kevinrose.vsc-python-indent",
+			"njpwerner.autodocstring",
 			"ms-azuretools.vscode-docker",
 			"alexcvzz.vscode-sqlite"
 		]
@@ -14,36 +16,6 @@
 		}
 	],
 	"settings": {
-		"editor.renderWhitespace": "selection",
-    	"editor.cursorBlinking": "phase",
-    	"editor.rulers": [80],
-		"python.linting.pylamaEnabled": true,
-		"python.linting.enabled": true,
-    	"python.analysis.memory.keepLibraryAst": true,
-		"python.languageServer": "Pylance",
-		"python.formatting.provider": "yapf",
-		"python.pythonPath": "c:\\Projects\\meteo-bot\\.venv\\Scripts\\python.exe",
-		"python.autoComplete.extraPaths": [
-			"./bot",
-			"./data_collector"
-		],
-		"python.analysis.extraPaths": [
-			"./bot",
-			"./data_collector"
-		],
-		"telemetry.enableTelemetry": false,
-		"telemetry.enableCrashReporter": false,
-	},
-	"launch": {
-		"version": "0.2.0",
-		"configurations": [
-			{
-				"name": "Python: Текущий файл",
-				"type": "python",
-				"request": "launch",
-				"program": "${file}",
-				"console": "integratedTerminal"
-			}
-		]
+		"python.languageServer": "Pylance"
 	}
 }

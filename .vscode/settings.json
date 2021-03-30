@@ -1,0 +1,23 @@
+{
+    "python.languageServer": "Pylance",
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "editor.renderWhitespace": "selection",
+    "editor.cursorBlinking": "phase",
+    "editor.rulers": [
+        100
+    ],
+    "python.linting.pylamaEnabled": true,
+    "python.linting.enabled": true,
+    "python.analysis.memory.keepLibraryAst": true,
+    "python.formatting.provider": "yapf",
+    "python.pythonPath": "c:\\Projects\\meteo-bot\\.venv\\Scripts\\python.exe",
+    "python.autoComplete.extraPaths": [
+        "./bot",
+        "./data_collector"
+    ],
+    "python.analysis.extraPaths": [
+        "./bot",
+        "./data_collector"
+    ],
+    "editor.formatOnSave": true
+}

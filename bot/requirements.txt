@@ -6,3 +6,4 @@ aiogram==2.11.2
 matplotlib==3.3.2
 aiosqlite==0.16.0
 tortoise-orm==0.16.17
+pydantic==1.7.2
