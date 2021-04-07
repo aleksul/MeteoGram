@@ -6,12 +6,14 @@ from tortoise import Tortoise
 from tortoise.functions import Min, Max
 from tortoise.query_utils import Q
 
-from models import OneMinuteData
+from models import OneMinuteData, PlotData, PlotDayData
 
 from datetime import datetime, timedelta, time, date
 
 from typing import IO
 from tempfile import NamedTemporaryFile
+
+__models__ = [OneMinuteData]
 
 
 class DatabaseHandler:
@@ -38,7 +40,8 @@ class DatabaseHandler:
             raise Exception("Wrong value")
         return True
 
-    async def getDataByTimedelta(self, start_point: datetime, delta: timedelta, value: str) -> list:
+    async def getDataByTimedelta(self, start_point: datetime, delta: timedelta,
+                                 value: str) -> PlotData:
         """Collects data from database in set period
 
         Args:
@@ -50,19 +53,19 @@ class DatabaseHandler:
             list: data you asked for
         """
         self.isValueCorrect(value)
-        result: list
+        result: PlotData
+        end_point: datetime
         if delta >= timedelta():  # if delta >= 0
-            result = (await OneMinuteData.filter(time__gte=start_point,
-                                                 time__lte=start_point +
-                                                 delta).order_by("time").values(value, "time"))
+            end_point = start_point + delta
         else:
-            result = (await OneMinuteData.filter(time__gte=start_point + delta,
-                                                 time__lte=start_point).order_by("time").values(
-                                                     value, "time"))
-        assert result, "Recieved nothing"
+            end_point = start_point
+            start_point += delta
+        query = OneMinuteData.filter(time__gte=start_point, time__lte=end_point).order_by("time")
+        result = PlotData(values=await query.values_list(value, flat=True),
+                          time=await query.values_list('time', flat=True))
         return result
 
-    async def getDataByDay(self, day: date, value: str) -> dict:
+    async def getDataByDay(self, day: date, value: str) -> PlotDayData:  # TODO rewrite for pydantic
         """Collects data from database on a certain day
 
         Args:
@@ -125,7 +128,7 @@ class DatabaseHandler:
                 f.write(bytes(stroka, "utf-8"))
         return f
 
-    async def getLastData(self) -> dict:
+    async def getLastData(self) -> dict:  # TODO rewrite for pydantic
         """Collects last data written to database
 
         Returns:
@@ -138,7 +141,7 @@ class DatabaseHandler:
         assert result is not None, "Recieved nothing"
         return result
 
-    async def getAllDates(self, includeToday=False) -> list:
+    async def getAllDates(self, includeToday=False) -> list:  # TODO rewrite for pydantic
         """Collects which days are written to database
 
         Args:
@@ -164,8 +167,8 @@ class DatabaseHandler:
             after -= timedelta(days=1)
         return result
 
-    async def getMonthData(self, value: str) -> dict:
-        """Collects min, max and Datetime.date for last 30 saved days
+    async def getMonthData(self, value: str) -> dict:  # TODO rewrite for pydantic
+        """Collects min, max and Datetime.date for last 30 (or less) saved days
 
         Args:
             value (str): Value, that needs to be collected from database
@@ -182,8 +185,8 @@ class DatabaseHandler:
         for day in dates:
             day_start = datetime.combine(day, time(0, 0, 0))
             day_end = day_start + timedelta(days=1)
-            temp = (await OneMinuteData.annotate(min=Min(value)).annotate(max=Max(value)).filter(
-                time__gte=day_start, time__lt=day_end).values("max", "min"))
+            temp = await OneMinuteData.annotate(min=Min(value)).annotate(max=Max(value)).filter(
+                time__gte=day_start, time__lt=day_end).values("max", "min")
             result["date"].append(day)
             temp = temp.pop(0)
             result["max"].append(temp["max"])
@@ -192,5 +195,7 @@ class DatabaseHandler:
         return result
 
 
+# testing
 if __name__ == "__main__":
     db = DatabaseHandler(db_path="sqlite://test_data.db")
+    print(async_run(db.getDataByTimedelta(datetime.now(), timedelta(hours=-1), "pm25")))

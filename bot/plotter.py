@@ -109,7 +109,7 @@ class MinutesPlotter(Plotter):
         # plot
         self.line, = self.ax.plot([], [], marker=".")
 
-    def plot_minutes(self, data: PlotData, value: str) -> bytes:
+    def plot_minutes(self, data: PlotData, value: str) -> bytes:  # TODO add data description
         """Plots a graph for N minutes
 
         Args:
@@ -125,10 +125,6 @@ class MinutesPlotter(Plotter):
             return self._plot_lots_of_minutes(data, value)
         # set new data
         self.line.set_data(data.time, data.values)
-
-        # TODO is it needed still? check database.py
-        # invert x axis + add extra space on y-axis
-        # plt.xlim(left=_time[0] - timedelta(minutes=1), right=_time[-1] + timedelta(minutes=1))
 
         # redraw
         self.ax.relim()
@@ -198,7 +194,7 @@ class DayPlotter(Plotter):
             borderaxespad=0.0,
         )
 
-    def plot_day(self, data: PlotDayData, value: str) -> bytes:
+    def plot_day(self, data: PlotDayData, value: str) -> bytes:  # TODO add data description
         """Plots graph of a day with min and max for four time periods
 
         Args:
@@ -270,7 +266,7 @@ class MonthPlotter(Plotter):
             borderaxespad=0.0,
         )
 
-    def plot_month(self, data: PlotMonthData, value: str) -> bytes:
+    def plot_month(self, data: PlotMonthData, value: str) -> bytes:  # TODO add data description
         """Plots month graph with min and max values of the day
 
         Args:

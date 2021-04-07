@@ -1,9 +1,9 @@
-from pydantic.class_validators import validator
 from tortoise import fields
 from tortoise.models import Model
 
+from typing import Tuple
 from pydantic import BaseModel, root_validator
-from typing import List, Optional
+from pydantic.class_validators import validator
 from datetime import date, datetime
 
 
@@ -27,61 +27,40 @@ class OneMinuteData(Model):
         table = "weather"
 
 
-'''
-class _Data(BaseModel):
-    pm25: Optional[float]
-    pm10: Optional[float]
-    temperature: Optional[float]
-    pressure: Optional[float]
-    humidity: Optional[float]
-    time: datetime
-
-    @root_validator
-    def one_is_required(cls, values):
-        assert not all(i is None for i in values), "At least one value is required"
-        return values
-
-
-class MinutesData(BaseModel):
-    data = List[_Data]
-
-'''
-
-
 class PlotData(BaseModel):
-    values: List[float]
-    time: List[datetime]
+    values: Tuple[float, ...]
+    time: Tuple[datetime, ...]
 
     @root_validator
     def same_length(cls, values):
-        assert len(values['time']) == len(values['values']), \
+        assert len(values.get('time')) == len(values.get('values')), \
             "The value must be the same length as the time list"
         return values
 
     @validator('values')
     def min_max_values_count(cls, v):
-        assert len(v) < 5, "We need MORE values"
-        assert len(v) > 330, "That's TOO MUCH (values), man"
+        assert len(v) > 3, "We need MORE values"
+        assert len(v) < 330, "That's TOO MUCH (values), man"
         return v
 
 
-class _MinMaxData(BaseModel):
+class MinMaxData(BaseModel):
     minimum: float
     maximum: float
 
 
 class PlotDayData(BaseModel):
     day: date
-    morning: _MinMaxData
-    noon: _MinMaxData
-    evening: _MinMaxData
-    night: _MinMaxData
+    morning: MinMaxData
+    noon: MinMaxData
+    evening: MinMaxData
+    night: MinMaxData
 
 
 class PlotMonthData(BaseModel):
-    minimum: List[float]
-    maximum: List[float]
-    dates: List[date]
+    minimum: Tuple[float, ...]
+    maximum: Tuple[float, ...]
+    dates: Tuple[date, ...]
 
     @root_validator
     def same_length(cls, values):
