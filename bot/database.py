@@ -6,7 +6,8 @@ from tortoise import Tortoise
 from tortoise.functions import Min, Max
 from tortoise.query_utils import Q
 
-from models import OneMinuteData, PlotData, PlotDayData
+from models import OneMinuteData  # tortoise model
+from models import MinuteData, PlotData, PlotDayData, MinMaxData  # pydantic models
 
 from datetime import datetime, timedelta, time, date
 
@@ -21,6 +22,15 @@ class DatabaseHandler:
     def __init__(self, db_path: str):
         self.DB_PATH = db_path
         async_run(Tortoise.init(db_url=self.DB_PATH, modules={"models": ["models"]}))
+
+        self.day_parts = {
+            "four_am": datetime.combine(date=date.today(), time=time(4, 0, 0)),
+            "ten_am": datetime.combine(date.today(), time(10, 0, 0)),
+            "four_pm": datetime.combine(date.today(), time(16, 0, 0)),
+            "ten_pm": datetime.combine(date.today(), time(22, 0, 0)),
+            "twelve_pm": datetime.combine(date.today(), time(0, 0, 0)),
+            "twelve_pm_next_day": datetime.combine(date.today() + timedelta(days=1), time(0, 0, 0))
+        }
 
     @staticmethod
     def isValueCorrect(value: str) -> bool:
@@ -50,7 +60,7 @@ class DatabaseHandler:
             value (str): Which data are you interested in
 
         Returns:
-            list: data you asked for
+            PlotData: pydantic model with data you asked for
         """
         self.isValueCorrect(value)
         result: PlotData
@@ -65,42 +75,48 @@ class DatabaseHandler:
                           time=await query.values_list('time', flat=True))
         return result
 
-    async def getDataByDay(self, day: date, value: str) -> PlotDayData:  # TODO rewrite for pydantic
+    async def getDataByDay(self, day: date, value: str) -> PlotDayData:
         """Collects data from database on a certain day
 
         Args:
-            day (date): The day to collect data
+            day (datetime.date): The day to collect data
             value (str): Which data are you interested in
 
         Returns:
-            dict: dict of dicts for every day part, each one contains max & min
+            PlotDayData: pydantic model with fields for
+            every day part, each one contains max & min
         """
         self.isValueCorrect(value)
-        four_am = datetime.combine(day, time(4, 0, 0))
-        ten_am = datetime.combine(day, time(10, 0, 0))
-        four_pm = datetime.combine(day, time(16, 0, 0))
-        ten_pm = datetime.combine(day, time(22, 0, 0))
-        twelve_pm = datetime.combine(day, time(0, 0, 0))
-        twelve_pm_next_day = twelve_pm + timedelta(days=1)
-        dayByParts = {
-            "morning":
-                await OneMinuteData.annotate(max=Max(value)).annotate(min=Min(value)).filter(
-                    time__gte=four_am, time__lt=ten_am).values("max", "min"),
-            "day":
-                await OneMinuteData.annotate(max=Max(value)).annotate(min=Min(value)).filter(
-                    time__gte=ten_am, time__lt=four_pm).values("max", "min"),
-            "evening":
-                await OneMinuteData.annotate(max=Max(value)).annotate(min=Min(value)).filter(
-                    time__gte=four_pm, time__lt=ten_pm).values("max", "min"),
-            "night":
-                await OneMinuteData.annotate(max=Max(value)).annotate(min=Min(value)).filter(
-                    Q(time__gte=twelve_pm, time__lt=four_am) |
-                    Q(time__gte=ten_pm, time__lte=twelve_pm_next_day)).values("max", "min"),
+        # preparing day dividers
+        parts = {}
+        for k, v in self.day_parts.items():
+            parts.update({k: v.replace(year=day.year, month=day.month, day=day.day)})
+        parts["twelve_pm_next_day"] += timedelta(days=1)
+        # preparing queries
+        mainQuery = OneMinuteData.annotate(max=Max(value)).annotate(min=Min(value))
+        queries = {
+            'morning':
+                mainQuery.filter(time__gte=parts['four_am'], time__lt=parts['ten_am']),
+            'noon':
+                mainQuery.filter(time__gte=parts['ten_am'], time__lt=parts['four_pm']),
+            'evening':
+                mainQuery.filter(time__gte=parts['four_pm'], time__lt=parts['ten_pm']),
+            'night':
+                mainQuery.filter(
+                    Q(time__gte=parts['twelve_pm'], time__lt=parts['four_am']) |
+                    Q(time__gte=parts['ten_pm'], time__lte=parts['twelve_pm_next_day']))
         }
-        for key in dayByParts.keys():
-            assert dayByParts[key] is not None, "Received nothing"
-            dayByParts[key] = dayByParts[key].pop(0)
-        return dayByParts
+        # execute queries
+        dataByParts = {}
+        for partName, query in queries.items():
+            t = (await query.values("max", "min"))[0]
+            dataByParts.update({partName: MinMaxData(minimum=t['min'], maximum=t['max'])})
+        # return retrieved values
+        return PlotDayData(day=day,
+                           morning=dataByParts['morning'],
+                           noon=dataByParts['noon'],
+                           evening=dataByParts['evening'],
+                           night=dataByParts['night'])
 
     async def getRawDataByDay(self, day: date) -> IO:
         """Creates .csv file with all day data
@@ -128,18 +144,19 @@ class DatabaseHandler:
                 f.write(bytes(stroka, "utf-8"))
         return f
 
-    async def getLastData(self) -> dict:  # TODO rewrite for pydantic
+    async def getLastData(self) -> MinuteData:
         """Collects last data written to database
 
         Returns:
-            dict: all values
+            MinuteData: pydantic model with all values
         """
-        result = await OneMinuteData.annotate(last=Max("id")).values()
-        result = result[0]
-        result.pop("id", None)
-        result.pop("last", None)
-        assert result is not None, "Recieved nothing"
-        return result
+        vals = (await OneMinuteData.annotate(last=Max("id")).values())[0]
+        return MinuteData(pm25=vals.pop('pm25'),
+                          pm10=vals.pop('pm10'),
+                          temperature=vals.pop('temperature'),
+                          pressure=vals.pop('pressure'),
+                          humidity=vals.pop('humidity'),
+                          time=vals.pop('time'))
 
     async def getAllDates(self, includeToday=False) -> list:  # TODO rewrite for pydantic
         """Collects which days are written to database
@@ -198,4 +215,4 @@ class DatabaseHandler:
 # testing
 if __name__ == "__main__":
     db = DatabaseHandler(db_path="sqlite://test_data.db")
-    print(async_run(db.getDataByTimedelta(datetime.now(), timedelta(hours=-1), "pm25")))
+    print(async_run(db.getDataByDay(date.today(), 'pm25')))

@@ -27,6 +27,20 @@ class OneMinuteData(Model):
         table = "weather"
 
 
+def not_empty(cls, values):
+    assert all(len(x) > 0 for x in values.values()), "Data can't be empty!"
+    return values
+
+
+class MinuteData(BaseModel):
+    pm25: float
+    pm10: float
+    temperature: float
+    pressure: float
+    humidity: float
+    time: datetime
+
+
 class PlotData(BaseModel):
     values: Tuple[float, ...]
     time: Tuple[datetime, ...]
@@ -62,6 +76,8 @@ class PlotMonthData(BaseModel):
     maximum: Tuple[float, ...]
     dates: Tuple[date, ...]
 
+    _empty_validator = root_validator(allow_reuse=True)(not_empty)
+
     @root_validator
     def same_length(cls, values):
         t = values.copy()
@@ -69,3 +85,9 @@ class PlotMonthData(BaseModel):
         assert all(len(x) == dates_len for x in t.values()), \
             "Min and max must be the same length as the dates list"
         return values
+
+
+class AllDates(BaseModel):
+    dates: Tuple[date, ...]
+
+    _empty_validator = root_validator(allow_reuse=True)(not_empty)
