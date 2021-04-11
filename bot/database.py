@@ -6,8 +6,8 @@ from tortoise import Tortoise
 from tortoise.functions import Min, Max
 from tortoise.query_utils import Q
 
-from models import OneMinuteData  # tortoise model
-from models import MinuteData, PlotData, PlotDayData, MinMaxData  # pydantic models
+from models import OneMinuteData, PlotMonthData  # tortoise model
+from models import MinuteData, PlotData, PlotDayData, MinMaxData, AllDates  # pydantic models
 
 from datetime import datetime, timedelta, time, date
 
@@ -40,14 +40,14 @@ class DatabaseHandler:
             value (str): value to check
 
         Raises:
-            Exception: value is incorrect
+            ValueError: value is incorrect
 
         Returns:
             bool: True, if value is correct
         """
         if value not in OneMinuteData.__vars__():
             logging.error(f"Got wrong value ({value})")
-            raise Exception("Wrong value")
+            raise ValueError("Wrong value")
         return True
 
     async def getDataByTimedelta(self, start_point: datetime, delta: timedelta,
@@ -72,7 +72,8 @@ class DatabaseHandler:
             start_point += delta
         query = OneMinuteData.filter(time__gte=start_point, time__lte=end_point).order_by("time")
         result = PlotData(values=await query.values_list(value, flat=True),
-                          time=await query.values_list('time', flat=True))
+                          time=await query.values_list('time', flat=True),
+                          valueName=value)
         return result
 
     async def getDataByDay(self, day: date, value: str) -> PlotDayData:
@@ -116,7 +117,8 @@ class DatabaseHandler:
                            morning=dataByParts['morning'],
                            noon=dataByParts['noon'],
                            evening=dataByParts['evening'],
-                           night=dataByParts['night'])
+                           night=dataByParts['night'],
+                           valueName=value)
 
     async def getRawDataByDay(self, day: date) -> IO:
         """Creates .csv file with all day data
@@ -158,7 +160,7 @@ class DatabaseHandler:
                           humidity=vals.pop('humidity'),
                           time=vals.pop('time'))
 
-    async def getAllDates(self, includeToday=False) -> list:  # TODO rewrite for pydantic
+    async def getAllDates(self, includeToday=False) -> AllDates:
         """Collects which days are written to database
 
         Args:
@@ -166,10 +168,10 @@ class DatabaseHandler:
             Defaults to False.
 
         Returns:
-            list: list of date objects
+            AllDates: pydantic model with tuple of date objects
         """
         start_day = date.today()
-        result = []
+        dates = []
         if includeToday:
             now = datetime.now()
             if now.hour == 0 and now.minute <= 1:  # no info for today
@@ -179,40 +181,32 @@ class DatabaseHandler:
         before = datetime.combine(start_day, time(0, 0, 0))
         after = datetime.combine(start_day, time(23, 59, 59))
         while await OneMinuteData.exists(time__gte=before, time__lte=after):
-            result.append(after.date())
+            dates.append(after.date())
             before -= timedelta(days=1)
             after -= timedelta(days=1)
-        return result
+        return AllDates(dates=dates)
 
-    async def getMonthData(self, value: str) -> dict:  # TODO rewrite for pydantic
+    async def getMonthData(self, value: str) -> PlotMonthData:
         """Collects min, max and Datetime.date for last 30 (or less) saved days
 
         Args:
             value (str): Value, that needs to be collected from database
 
         Returns:
-            dict: Dict of lists with values
+            PlotMonthData: pydantic model with max, min and dates tuples
         """
         self.isValueCorrect(value)
-        result = {"max": [], "min": [], "date": []}
-        dates = await self.getAllDates()
+        dates = (await self.getAllDates()).dates
+        data_max = []
+        data_min = []
         assert len(dates) >= 2, "Got not enough info"
         if len(dates) > 30:
             dates = dates[0:30]  # limit to 30 dates
+        query = OneMinuteData.annotate(min=Min(value)).annotate(max=Max(value))
         for day in dates:
             day_start = datetime.combine(day, time(0, 0, 0))
             day_end = day_start + timedelta(days=1)
-            temp = await OneMinuteData.annotate(min=Min(value)).annotate(max=Max(value)).filter(
-                time__gte=day_start, time__lt=day_end).values("max", "min")
-            result["date"].append(day)
-            temp = temp.pop(0)
-            result["max"].append(temp["max"])
-            result["min"].append(temp["min"])
-        assert all(result.values()) is True, "Recieved nothing"
-        return result
-
-
-# testing
-if __name__ == "__main__":
-    db = DatabaseHandler(db_path="sqlite://test_data.db")
-    print(async_run(db.getDataByDay(date.today(), 'pm25')))
+            t = (await query.filter(time__gte=day_start, time__lt=day_end).values("max", "min"))[0]
+            data_max.append(t["max"])
+            data_min.append(t["min"])
+        return PlotMonthData(minimum=data_min, maximum=data_max, dates=dates, valueName=value)

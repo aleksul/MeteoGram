@@ -32,6 +32,11 @@ def not_empty(cls, values):
     return values
 
 
+def check_value_name(cls, v):
+    assert v in OneMinuteData.__vars__()
+    return v
+
+
 class MinuteData(BaseModel):
     pm25: float
     pm10: float
@@ -44,6 +49,9 @@ class MinuteData(BaseModel):
 class PlotData(BaseModel):
     values: Tuple[float, ...]
     time: Tuple[datetime, ...]
+    valueName: str
+
+    _valueName_validator = validator('valueName', allow_reuse=True)(check_value_name)
 
     @root_validator
     def same_length(cls, values):
@@ -69,18 +77,25 @@ class PlotDayData(BaseModel):
     noon: MinMaxData
     evening: MinMaxData
     night: MinMaxData
+    valueName: str
+
+    _valueName_validator = validator('valueName', allow_reuse=True)(check_value_name)
 
 
 class PlotMonthData(BaseModel):
     minimum: Tuple[float, ...]
     maximum: Tuple[float, ...]
     dates: Tuple[date, ...]
+    valueName: str
 
     _empty_validator = root_validator(allow_reuse=True)(not_empty)
+
+    _valueName_validator = validator('valueName', allow_reuse=True)(check_value_name)
 
     @root_validator
     def same_length(cls, values):
         t = values.copy()
+        t.pop('valueName')
         dates_len = len(t.pop('dates'))
         assert all(len(x) == dates_len for x in t.values()), \
             "Min and max must be the same length as the dates list"

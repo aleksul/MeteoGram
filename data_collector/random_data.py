@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, date
 import peewee
 
 
-def write_all_day_data(db: peewee.SqliteDatabase, _date=datetime.now().date()):
+def write_all_day_data(db: peewee.SqliteDatabase, _date=date.today()):
     time = datetime.now()
     time = time.replace(hour=0, minute=0, second=0, microsecond=0)
     time = time.replace(year=_date.year, month=_date.month, day=_date.day)
@@ -42,12 +42,3 @@ if __name__ == '__main__':
 
     # write_all_day_data(db, _date=date(2020, 11, 16))
     write_all_day_data(db)
-
-    db.connect()
-    query = (OneMinuteData.select(
-        OneMinuteData.temperature, OneMinuteData.time).where(
-            OneMinuteData.time > datetime.now().replace(
-                hour=1, minute=29, second=59),
-            OneMinuteData.time <= datetime.now().replace(hour=2, minute=0)))
-    print([i.temperature for i in query])
-    # print([i.time for i in query])
