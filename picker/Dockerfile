@@ -1,16 +1,10 @@
-FROM python:3.8-slim as base
+FROM python:3.8-slim-buster as base
 
 WORKDIR /build/
-
-# install gcc
-RUN apt-get update && \
-    apt-get install --no-install-recommends -y gcc && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # install python requirements in a special folder
 COPY ./requirements.txt /build/requirements.txt
 RUN pip install -q --target /build/ --no-cache-dir -r requirements.txt
-
 
 ##### START NEW IMAGE : DEBUGGER #####
 FROM base as debug
@@ -19,6 +13,8 @@ FROM base as debug
 ENV TZ Europe/Moscow
 # select folder with python requirements
 ENV PYTHONPATH="/build/"
+# set debug
+ENV MeteostationIP="DEBUG"
 
 # install debugger
 RUN pip install ptvsd
@@ -28,7 +24,7 @@ WORKDIR /code/
 COPY ./src/ /code/
 
 # run debugger
-CMD ["python", "-m", "ptvsd", "--host 0.0.0.0", "--port 5678", "--wait", "main.py"]
+CMD ["python", "-m", "ptvsd", "--host 0.0.0.0", "--port 5679", "--wait", "main.py"]
 
 
 ##### START NEW IMAGE: PRODUCTION #####
@@ -36,6 +32,9 @@ FROM python:3.8-alpine as prod
 
 # set the user
 USER 1000
+
+# set ip
+ENV MeteostationIP="192.168.0.175"
 
 # set the timezone
 ENV TZ Europe/Moscow

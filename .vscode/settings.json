@@ -10,12 +10,13 @@
     "python.analysis.memory.keepLibraryAst": true,
     "python.formatting.provider": "yapf",
     "python.autoComplete.extraPaths": [
-        "./bot",
-        "./data_collector"
+        "./bot/src",
+        "./data_collector/src",
+        "./.venv/Scripts"
     ],
     "python.analysis.extraPaths": [
-        "./bot",
-        "./data_collector"
+        "./bot/src",
+        "./data_collector/src"
     ],
     "editor.formatOnSave": true
 }

@@ -8,8 +8,6 @@ from os import environ
 import peewee
 
 DB_PATH = '/meteo_data/data.db'
-if 'DEBUG' in environ:
-    DB_PATH = 'test_data.db'
 
 db = peewee.SqliteDatabase(DB_PATH, autoconnect=False)
 
@@ -28,13 +26,7 @@ class OneMinuteData(peewee.Model):
 
 
 def html_parser(text) -> dict:
-    data = {
-        'PM2.5': -1,
-        'PM10': -1,
-        'Temperature': -1,
-        'Pressure': -1,
-        'Humidity': -1
-        }
+    data = {'PM2.5': -1, 'PM10': -1, 'Temperature': -1, 'Pressure': -1, 'Humidity': -1}
     for row in BeautifulSoup(text, 'html.parser').find('table').find_all("tr"):
         row = BeautifulSoup(row, 'html.parser').find_all('td')
         for tag in range(0, len(row)):
@@ -48,8 +40,9 @@ def html_parser(text) -> dict:
                 data[row[1]] = float(row[2].split()[0])  # convert values
                 if row[1] == 'Pressure':  # hPa to mmHg
                     data[row[1]] = round(data[row[1]] * 100 / 133, 2)
-    assert not(all(item == -1 for item in data.values())), "All values \
+    assert not (all(item == -1 for item in data.values())), "All values \
         haven't changed yet"
+
     data.update(Time=datetime.now())  # adding timestamp
     return data
 
@@ -59,8 +52,7 @@ def get_info(ip: str, errors_left=2):
         response = requests.get(ip, timeout=15)
         assert response.status_code == 200
     except Exception as err:
-        logging.error(
-            f"Getting info from meteostation error: {type(err)}:{err}")
+        logging.error(f"Getting info from meteostation error: {type(err)}:{err}")
         logging.error(f'Retries left: {errors_left}')
         errors_left -= 1
         if errors_left > 0:

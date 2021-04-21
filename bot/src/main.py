@@ -1,5 +1,5 @@
 #!/usr/bin/python3.8
-from asyncio import new_event_loop, set_event_loop, gather
+from asyncio import new_event_loop, set_event_loop
 
 from aiogram import Bot as aiogram_bot, Dispatcher, executor as aiogram_executor
 from aiogram.types import ReplyKeyboardMarkup
@@ -7,7 +7,6 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.types import Message, CallbackQuery
 from aiogram.types import ChatActions, InputFile
 
-from proxy_helper import ProxyGrabber, check_site
 from plotter import Plotter
 from database import DatabaseHandler
 import logging
@@ -33,22 +32,7 @@ KB_START.add("/now", "/graph", "/help")
 KB_START2 = ReplyKeyboardMarkup(one_time_keyboard=False, resize_keyboard=True)
 KB_START2.add("/now", "/graph")
 KB_ADMIN = ReplyKeyboardMarkup(one_time_keyboard=False, resize_keyboard=True, row_width=2)
-KB_ADMIN.add("/log", "/clear_log", "/back")
-
-
-async def doWeNeedProxy() -> bool:
-    # internet connection test
-    results = await gather(
-        check_site("http://example.org/"),
-        check_site(f"https://api.telegram.org/bot{BOT_TOKEN}/getMe"),
-    )
-    logging.info(f"Internet test results:" f"example.org: {results[0]}, " f"telegram: {results[1]}")
-    if not results[0]:  # we dont have internet access
-        raise OSError("No internet")
-    elif (results[0] and not results[1]):  # we have internet access but no access to telegram
-        return True
-    elif results[0] and results[1]:  # we have access to telegram without proxy!
-        return False
+KB_ADMIN.add("/log")
 
 
 db = DatabaseHandler(db_path="sqlite:///meteo_data/data.db")
@@ -57,16 +41,7 @@ graphics = Plotter()
 loop = new_event_loop()
 set_event_loop(loop)
 
-BOT: aiogram_bot
-if loop.run_until_complete(doWeNeedProxy()):
-    proxyFinder = ProxyGrabber(
-        timeout=3,
-        filename=f"{DIRECTORY}proxy.dat",
-        site_to_test=f"https://api.telegram.org/bot{BOT_TOKEN}/getMe",
-    )
-    BOT = aiogram_bot(token=BOT_TOKEN, proxy=loop.run_until_complete(proxyFinder.grab()))
-else:
-    BOT = aiogram_bot(token=BOT_TOKEN)
+BOT = aiogram_bot(token=BOT_TOKEN)
 dp = Dispatcher(BOT)
 
 
@@ -224,35 +199,18 @@ async def send_graph_kb(message: Message):
 
 @dp.message_handler(
     lambda msg: (str(msg.from_user.id) in ADMIN_ID),
-    commands=["admin", "log", "clear_log", "back"],
+    commands=["log"]
 )
-async def admin_commands(message: Message):
-    # handels only messages from admins, only special commands
+async def send_log(message: Message):
+    """Sends log file (only to admins)
 
-    if message.get_command() == "/admin":
-        await message.answer(
-            f"Наконец то мой дорогой админ "
-            f"{message.from_user.first_name} "
-            f"добрался до раздела админских возможностей!\n\n"
-            f"• Напишите /log для получения файла логов,"
-            f" /clear_log для того чтобы его отчистить\n"
-            f"• Напишите /back для "
-            f"возврашения стандартной клавиатуры",
-            reply_markup=KB_ADMIN,
-        )
-    elif message.get_command() == "/log":
-        # sends log file
-        await BOT.send_chat_action(message.chat.id, ChatActions.UPLOAD_DOCUMENT)
-        with open(DIRECTORY + LOG_FILENAME, "rb") as f:
-            doc = InputFile(f, filename="log.txt")
-            await message.answer_document(doc)
-    elif message.get_command() == "/clear_log":
-        with open(DIRECTORY + LOG_FILENAME, "w"):  # log clearing
-            pass
-        logging.info("Cleared log")
-        await message.answer("Лог был отчищен!")
-    elif message.get_command() == "/back":  # gives back standart keyboard layout
-        await message.answer("Возвращаю нормальную клавиатуру 😉", reply_markup=KB_START2)
+    Args:
+        message (aiogram.types.Message)
+    """
+    await BOT.send_chat_action(message.chat.id, ChatActions.UPLOAD_DOCUMENT)
+    with open(DIRECTORY + LOG_FILENAME, "rb") as f:
+        doc = InputFile(f, filename="log.txt")
+        await message.answer_document(doc)
 
 
 if __name__ == "__main__":

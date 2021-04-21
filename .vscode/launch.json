@@ -1,12 +1,38 @@
 {
-    "version": "0.2.0",
+	"version": "0.2.0",
 	"configurations": [
-			{
-				"name": "Python: Текущий файл",
-				"type": "python",
-				"request": "launch",
-				"program": "${file}",
-				"console": "integratedTerminal"
-			}
-		]
+		{
+			"name": "Python: Текущий файл",
+			"type": "python",
+			"request": "launch",
+			"program": "${file}",
+			"console": "integratedTerminal"
+		},
+		{
+			"name": "Python Attach Bot",
+			"type": "python",
+			"request": "attach",
+			"pathMappings": [
+				{
+					"localRoot": "${workspaceFolder}/bot/src/",
+					"remoteRoot": "/code/"
+				}
+			],
+			"port": 5678,
+			"host": "127.0.0.1"
+		},
+		{
+			"name": "Python Attach Picker",
+			"type": "python",
+			"request": "attach",
+			"pathMappings": [
+				{
+					"localRoot": "${workspaceFolder}/data_collector/src/",
+					"remoteRoot": "/code/"
+				}
+			],
+			"port": 5679,
+			"host": "127.0.0.1"
+		},
+	]
 }
