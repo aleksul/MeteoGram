@@ -1,0 +1,4 @@
+matplotlib==3.3.2
+tortoise-orm==0.17.2
+pydantic==1.8.1
+loguru==0.5.3

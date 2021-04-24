@@ -128,8 +128,7 @@ class ProxyGrabber:
         # it's better to use one session per all requests
         async with aiohttp.ClientSession() as session:
             # check all the proxies in parallel mode
-            checked_proxies = await asyncio.gather(*[(self.check(i, session)) for i in read_proxies]
-                                                  )
+            checked_proxies = await asyncio.gather(*[self.check(i, session) for i in read_proxies])
         checked_proxies = [i for i in checked_proxies if i]  # delete all None's
         if checked_proxies:  # for the case, when all proxies are bad
             checked_proxies = sorted(checked_proxies,

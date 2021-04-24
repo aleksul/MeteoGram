@@ -6,16 +6,70 @@
 			"ms-python.vscode-pylance",
 			"kevinrose.vsc-python-indent",
 			"njpwerner.autodocstring",
-			"ms-azuretools.vscode-docker",
-			"alexcvzz.vscode-sqlite"
+			"ms-azuretools.vscode-docker"
 		]
 	},
 	"folders": [
 		{
+			"name": "Bot",
+			"path": "./bot"
+		},
+		{
+			"name": "Graphics",
+			"path": "./graphics"
+		},
+		{
+			"name": "Picker",
+			"path": "./picker"
+		},
+		{
+			"name": "Proxy Finder",
+			"path": "./proxyFinder"
+		},
+		{
+			"name": "Project Settings",
 			"path": "."
 		}
 	],
 	"settings": {
-		"python.languageServer": "Pylance"
+		"python.languageServer": "Pylance",
+		"files.exclude": {
+			"**/.git": true,
+			"**/bot": true,
+			"**/graphics": true,
+			"**/picker": true,
+			"**/proxyFinder": true
+		},
+		"python.terminal.activateEnvInCurrentTerminal": true,
+		"editor.renderWhitespace": "selection",
+		"editor.cursorBlinking": "phase",
+		"editor.rulers": [
+			100
+		],
+		"python.linting.pylamaEnabled": true,
+		"python.linting.enabled": true,
+		"python.analysis.memory.keepLibraryAst": true,
+		"python.formatting.provider": "yapf",
+		"python.autoComplete.extraPaths": [
+			"./bot/src",
+			"./picker/src",
+			"./graphics/src",
+			"./proxyFinder/src",
+			"./.venv/Scripts"
+		],
+		"python.analysis.extraPaths": [
+			"./bot/src",
+			"./picker/src",
+			"./graphics/src",
+			"./proxyFinder/src",
+			"./data_collector/src"
+		],
+		"editor.formatOnSave": true,
+		"python.linting.pylamaArgs": [
+			"-i E501"
+		],
+		"python.formatting.yapfArgs": [
+			"--style='{based_on_style: google, column_limit = 100}'"
+		]
 	}
 }

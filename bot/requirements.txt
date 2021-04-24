@@ -1,7 +1,4 @@
 asyncio==3.4.3
-proxybroker==0.3.2
 aiogram==2.11.2
-matplotlib==3.3.2
-tortoise-orm==0.17.2
 pydantic==1.8.1
 loguru==0.5.3

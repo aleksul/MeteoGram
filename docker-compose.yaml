@@ -1,39 +1,64 @@
 version: "3.8"
 
-volumes:
-  meteo_data:
-
 services:
   bot:
-    image: registry.gitlab.com/aleksul/meteo-bot/bot:beta-3.0
+    build: 
+      context: ./bot/
+      cache_from:
+        - python:3.8-slim
+        - python:3.8-alpine
+      target: prod
+    env_file:
+      - bot.env
+      - database.env
+    volumes: 
+      - type: volume
+        source: proxy-data
+        target: /proxy-data
+        read_only: true
     deploy:
-      mode: global
       restart_policy:
         condition: on-failure
         delay: 10s
         max_attempts: 5
         window: 15s
-      resources:
-        limits:
-          cpus: '0.75'
-          memory: 60M
-        reservations:
-          cpus: '0.25'
-          memory: 25M
-    volumes:
-        - meteo_data:/meteo_data
-  meteo-collector:
-    image: registry.gitlab.com/aleksul/meteo-bot/collector:beta-3.0
+    depends_on: 
+      - db
+
+  picker:
+    build: ./picker/
+    env_file:
+      - database.env
     deploy:
-      mode: global
       restart_policy:
         condition: on-failure
         delay: 20s
         max_attempts: 10
         window: 30s
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: 30M
+
+  proxyFinder:
+    build: 
+      context: ./proxyFinder/
+      cache_from:
+        - python:3.8
+        - python:3.8-alpine
+      target: prod
+    restart: on-failure
+    volumes: 
+      - proxy-data:/proxy-data
+    environment: 
+      PROXY_DIR: '/proxy-data/'
+
+  db:
+    image: postgres:13-alpine
+    restart: always
+    env_file:
+      - database.env
+    expose:
+      - "5432"
     volumes:
-        - meteo_data:/meteo_data
+      - db-data:/var/lib/postgresql/data
+
+volumes:
+  db-data:
+  proxy-data:

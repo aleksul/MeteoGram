@@ -1,24 +1,31 @@
+import asyncio
+from os import environ
+from icmplib import multiping
+from proxylib import ProxyGrabber
 
-if loop.run_until_complete(doWeNeedProxy()):
-    proxyFinder = ProxyGrabber(
-        timeout=3,
-        filename=f"{DIRECTORY}proxy.dat",
-        site_to_test=f"https://api.telegram.org/bot{BOT_TOKEN}/getMe",
-    )
-    BOT = aiogram_bot(token=BOT_TOKEN, proxy=loop.run_until_complete(proxyFinder.grab()))
-else:
-    pass
+DIRECTORY = environ.get("PROXY_DIR", default="./")
 
-async def doWeNeedProxy() -> bool:
+
+def doWeNeedProxy() -> bool:
     # internet connection test
-    results = await gather(
-        check_site("http://example.org/"),
-        check_site(f"https://api.telegram.org/bot{BOT_TOKEN}/getMe"),
-    )
-    logging.info(f"Internet test results:" f"example.org: {results[0]}, " f"telegram: {results[1]}")
-    if not results[0]:  # we dont have internet access
-        raise OSError("No internet")
-    elif (results[0] and not results[1]):  # we have internet access but no access to telegram
-        return True
-    elif results[0] and results[1]:  # we have access to telegram without proxy!
+    results: list = multiping(["example.org", "google.com", "api.telegram.org"])
+    assert results[2].address == "api.telegram.org"
+    if results[2].is_alive:  # telegram works without proxy!
         return False
+    elif results[0].is_alive or results[1].is_alive:  # we need proxy :sad:
+        return True
+    else:  # no internet access
+        raise ConnectionError("No internet connection")
+
+
+if __name__ == "__main__":
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    if doWeNeedProxy():
+        proxyFinder = ProxyGrabber(
+            timeout=3,
+            filename=f"{DIRECTORY}proxy.dat",
+            site_to_test=f"https://api.telegram.org"
+        )
+        proxy = loop.run_until_complete(proxyFinder.grab())

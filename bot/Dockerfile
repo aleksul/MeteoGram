@@ -1,27 +1,28 @@
-FROM python:3.8-slim as base
+FROM python:3.8 as base
 
 WORKDIR /build/
 
-# install gcc
-RUN apt-get update && \
-    apt-get install --no-install-recommends -y gcc && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# create new venv
+RUN python -m venv /build/
+ENV PATH=/build/bin:$PATH
 
 # install python requirements in a special folder
-COPY ./requirements.txt /build/requirements.txt
-RUN pip install -q --target /build/ --no-cache-dir -r requirements.txt
+COPY requirements.txt .
+RUN pip install -q --no-cache-dir -r requirements.txt
 
 
 ##### START NEW IMAGE : DEBUGGER #####
-FROM base as debug
+FROM python:3.8-slim as debug
 
 # set the timezone
 ENV TZ Europe/Moscow
-# select folder with python requirements
-ENV PYTHONPATH="/build/"
+
+# copy libs
+COPY --from=base /build /requirements/
+ENV PATH=/requirements/bin/:$PATH
 
 # install debugger
-RUN pip install ptvsd
+RUN pip install --no-cache-dir ptvsd
 
 # copy code
 WORKDIR /code/
@@ -32,7 +33,7 @@ CMD ["python", "-m", "ptvsd", "--host 0.0.0.0", "--port 5678", "--wait", "main.p
 
 
 ##### START NEW IMAGE: PRODUCTION #####
-FROM python:3.8-alpine as prod
+FROM python:3.8-slim as prod
 
 # set the user
 USER 1000
@@ -41,9 +42,8 @@ USER 1000
 ENV TZ Europe/Moscow
 
 # copy libs
-WORKDIR /requirements/
-COPY --from=base /build/ /requirements/
-ENV PYTHONPATH="/requirements/"
+COPY --from=base /build /requirements/
+ENV PATH=/requirements/bin/:$PATH
 
 # copy code
 WORKDIR /code/

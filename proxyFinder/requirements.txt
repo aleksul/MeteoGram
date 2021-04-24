@@ -1,0 +1,4 @@
+asyncio==3.4.3
+aiohttp==3.7.3
+icmplib==2.1.1
+proxybroker==0.3.2
