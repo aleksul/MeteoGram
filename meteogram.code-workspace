@@ -1,0 +1,34 @@
+{
+	"extensions": {
+		"recommendations": [
+			"ms-python.python",
+			"ms-toolsai.jupyter",
+			"ms-python.vscode-pylance",
+			"njpwerner.autodocstring",
+			"ms-azuretools.vscode-docker",
+		]
+	},
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "src/telegram-service"
+		},
+		{
+			"path": "src/data-receiver-service"
+		}
+	],
+	"settings": {
+		"editor.renderWhitespace": "selection",
+		"editor.cursorBlinking": "phase",
+		"editor.rulers": [
+			100
+		],
+		"editor.formatOnSave": true,
+		"files.exclude": {
+			"**/.git": true,
+			"**/src": true,
+		}
+	}
+}

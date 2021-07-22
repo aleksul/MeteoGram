@@ -1,5 +1,5 @@
 #!/usr/bin/python3.8
-from asyncio import new_event_loop, set_event_loop, gather
+from loguru import logging
 
 from aiogram import Bot as aiogram_bot, Dispatcher, executor as aiogram_executor
 from aiogram.types import ReplyKeyboardMarkup
@@ -7,66 +7,17 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.types import Message, CallbackQuery
 from aiogram.types import ChatActions, InputFile
 
-from proxy_helper import ProxyGrabber, check_site
-from plotter import Plotter
-from database import DatabaseHandler
-import logging
 from os import environ, remove
 from datetime import datetime, timedelta
 
-DIRECTORY = "/code/"
-LOG_FILENAME = "bot.log"
-logging.basicConfig(
-    filename=DIRECTORY + LOG_FILENAME,
-    format="%(asctime)s    %(levelname)s: %(message)s",
-    datefmt="%d/%m/%Y %H:%M:%S",
-    level=logging.INFO,
-)
 logging.info("Program started")
 
-ADMIN_ID = environ.get("ADMIN_IDs", "").split(",")
 BOT_TOKEN = environ.get("BotToken")
 assert BOT_TOKEN is not None, "Bot token was NOT set"
 
-KB_START = ReplyKeyboardMarkup(one_time_keyboard=False, resize_keyboard=True, row_width=2)
-KB_START.add("/now", "/graph", "/help")
-KB_START2 = ReplyKeyboardMarkup(one_time_keyboard=False, resize_keyboard=True)
-KB_START2.add("/now", "/graph")
-KB_ADMIN = ReplyKeyboardMarkup(one_time_keyboard=False, resize_keyboard=True, row_width=2)
-KB_ADMIN.add("/log", "/clear_log", "/back")
+KB = ReplyKeyboardMarkup(one_time_keyboard=False, resize_keyboard=True).add("/current")
 
-
-async def doWeNeedProxy() -> bool:
-    # internet connection test
-    results = await gather(
-        check_site("http://example.org/"),
-        check_site(f"https://api.telegram.org/bot{BOT_TOKEN}/getMe"),
-    )
-    logging.info(f"Internet test results:" f"example.org: {results[0]}, " f"telegram: {results[1]}")
-    if not results[0]:  # we dont have internet access
-        raise OSError("No internet")
-    elif (results[0] and not results[1]):  # we have internet access but no access to telegram
-        return True
-    elif results[0] and results[1]:  # we have access to telegram without proxy!
-        return False
-
-
-db = DatabaseHandler(db_path="sqlite:///meteo_data/data.db")
-graphics = Plotter()
-
-loop = new_event_loop()
-set_event_loop(loop)
-
-BOT: aiogram_bot
-if loop.run_until_complete(doWeNeedProxy()):
-    proxyFinder = ProxyGrabber(
-        timeout=3,
-        filename=f"{DIRECTORY}proxy.dat",
-        site_to_test=f"https://api.telegram.org/bot{BOT_TOKEN}/getMe",
-    )
-    BOT = aiogram_bot(token=BOT_TOKEN, proxy=loop.run_until_complete(proxyFinder.grab()))
-else:
-    BOT = aiogram_bot(token=BOT_TOKEN)
+BOT = aiogram_bot(token=BOT_TOKEN)
 dp = Dispatcher(BOT)
 
 
@@ -85,18 +36,7 @@ async def send_welcome(message: Message):
 async def send_help(message: Message):
     await message.answer(
         "Все чрезвычайно просто:\n"
-        "• для просмотра текущего состояния напиши /now\n"
-        "• для построения графика напиши /graph\n"
-        "• для просмотра сырого файла напиши /raw\n\n"
-        "Интересуют подробности отображаемых измерений?\n"
-        "Напиши /info",
-        reply_markup=KB_START2,
-    )
-
-
-@dp.message_handler(commands=["info"])
-async def send_info(message: Message):
-    await message.answer(
+        "• для просмотра текущего состояния напиши /current\n\n"
         "Где производится замер?\n"
         "Метеостанция располгается по адресу: "
         "г.Москва, г.Троицк, "
@@ -117,7 +57,7 @@ async def send_info(message: Message):
         "Согласно ВОЗ, среднесуточный уровень этих частиц "
         "не должен быть больше 25 мкгр/м³\n"
         "Подробнее можно прочитать, например, здесь:\n"
-        "https://habr.com/ru/company/tion/blog/396111/",
+        "https://habr.com/ru/company/tion/blog/396111/"",
         reply_markup=KB_START2,
     )
 
